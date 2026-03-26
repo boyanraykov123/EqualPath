@@ -72,8 +72,6 @@ function showRI() { gi('route-info').classList.add('visible'); }
 
 function hideRI() {
   gi('route-info').classList.remove('visible');
-  gi('ai-reason').style.display = 'none';
-  gi('ai-warning').style.display = 'none';
   gi('profile-metrics').style.display = 'none';
 }
 
@@ -112,17 +110,6 @@ function renderRoute(data) {
 
   // Профил-специфични метрики
   renderProfileMetrics(profile, data.osm_data || {});
-
-  // AI обяснение
-  if (data.reason) {
-    gi('ai-reason-text').textContent = data.reason;
-    gi('ai-reason').style.display    = 'block';
-  }
-  // AI предупреждение
-  if (data.warning) {
-    gi('ai-warning-text').textContent = data.warning;
-    gi('ai-warning').style.display    = 'block';
-  }
 
   showRI();
   map.fitBounds(S.routePoly.getBounds(), { padding: [50, 50] });
@@ -209,12 +196,34 @@ gi('btn-find-route').addEventListener('click', async () => {
 
 
 /* ── Бутон „Изчисти маршрута" ─────────────────────────────── */
-gi('btn-clear-route').addEventListener('click', () => {
+function clearMapRoute() {
   routeL.clearLayers();
   S.routePoly = null;
   S.routeGlow = null;
   hideRI();
   sessionStorage.removeItem('eq_route');
+  
+  // Изчистване на начална и крайна точка
+  S.from = null;
+  S.to = null;
+  gi('input-from').value = '';
+  gi('input-to').value = '';
+  gi('input-from').classList.remove('is-set');
+  gi('input-to').classList.remove('is-set');
+  
+  // Премахване на маркери
+  if (typeof mA !== 'undefined' && mA) {
+    markL.removeLayer(mA);
+    mA = null;
+  }
+  if (typeof mB !== 'undefined' && mB) {
+    markL.removeLayer(mB);
+    mB = null;
+  }
+}
+
+gi('btn-clear-route').addEventListener('click', () => {
+  clearMapRoute();
   toast('Маршрутът е изчистен.');
 });
 

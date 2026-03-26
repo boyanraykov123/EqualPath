@@ -200,6 +200,7 @@ gi('btn-do-register').addEventListener('click', async () => {
 /* ── logIn / logOut ──────────────────────────────────────── */
 function logIn(user) {
   S.user = user;
+  clearMapRoute();
   const prof = user.profile ?? 'general';
   const r = document.querySelector(`input[name="user-profile"][value="${prof}"]`);
   if (r) { r.checked = true; r.dispatchEvent(new Event('change')); }
@@ -227,6 +228,7 @@ function logIn(user) {
 gi('btn-logout').addEventListener('click', async () => {
   await sb.auth.signOut();
   S.user = null;
+  clearMapRoute();
   gi('btn-login').style.display = 'flex';
   gi('user-chip').style.display = 'none';
   gi('profile-user-banner').classList.remove('vis');
