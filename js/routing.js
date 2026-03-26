@@ -74,6 +74,7 @@ function hideRI() {
   gi('route-info').classList.remove('visible');
   gi('ai-reason').style.display = 'none';
   gi('ai-warning').style.display = 'none';
+  gi('profile-metrics').style.display = 'none';
 }
 
 
@@ -81,15 +82,36 @@ function hideRI() {
 function renderRoute(data) {
   routeL.clearLayers();
 
-  // Glow + главна линия
-  L.geoJSON(data.geojson, { style: { color: '#1e9e75', opacity: .12, weight: 16, lineCap: 'round', lineJoin: 'round' } }).addTo(routeL);
-  S.routePoly = L.geoJSON(data.geojson, { style: { color: '#1e9e75', opacity: .9, weight: 5, lineCap: 'round', lineJoin: 'round' } }).addTo(routeL);
+  const profile = data.profile || document.querySelector('input[name="user-profile"]:checked')?.value || 'general';
+  const color = PCOLORS[profile] || '#1e9e75';
+
+  // GeoJSON [lon,lat] → Leaflet [lat,lng]
+  const toLatLngs = (geojson) => (geojson.coordinates || []).map(c => [c[1], c[0]]);
+
+  // Алтернативни маршрути (тънки, профилен цвят, полупрозрачни)
+  if (data.alternatives?.length) {
+    for (const alt of data.alternatives) {
+      if (!alt.geojson || !alt.geojson.coordinates) continue;
+      const altLine = L.polyline(toLatLngs(alt.geojson), {
+        color, opacity: .3, weight: 4, lineCap: 'round', lineJoin: 'round', dashArray: '8 6',
+      }).addTo(routeL);
+      altLine.bindTooltip(`${alt.distance_km} км · ${Math.ceil(alt.duration_min)} мин`, { sticky: true, opacity: .9 });
+    }
+  }
+
+  // Glow + главна линия (L.polyline — винаги прилага цвета коректно)
+  const latlngs = toLatLngs(data.geojson);
+  S.routeGlow = L.polyline(latlngs, { color, opacity: .2, weight: 18, lineCap: 'round', lineJoin: 'round' }).addTo(routeL);
+  S.routePoly = L.polyline(latlngs, { color, opacity: .95, weight: 6, lineCap: 'round', lineJoin: 'round' }).addTo(routeL);
 
   // Статистики от backend
   gi('route-distance').textContent      = data.distance_km;
   gi('route-duration').textContent      = Math.ceil(data.duration_min);
   gi('route-comfort-score').textContent = data.comfort_index;
   updateDots(data.comfort_index);
+
+  // Профил-специфични метрики
+  renderProfileMetrics(profile, data.osm_data || {});
 
   // AI обяснение
   if (data.reason) {
@@ -115,6 +137,41 @@ function renderRoute(data) {
       toName: gi('input-to').value,
     }));
   } catch {}
+}
+
+
+/* ── Профил-специфични метрики (чипове) ──────────────────── */
+function renderProfileMetrics(profile, osm) {
+  const container = gi('profile-metrics');
+  const title     = gi('profile-metrics-title');
+  const chips     = gi('profile-metrics-chips');
+  const metrics   = PMETRICS[profile];
+
+  if (!metrics || !osm) {
+    container.style.display = 'none';
+    return;
+  }
+
+  const label = PLABELS[profile] || profile;
+  title.textContent = `${label} — ключови показатели`;
+  chips.innerHTML = '';
+
+  for (const m of metrics) {
+    const val = osm[m.key] ?? 0;
+    const isBad = m.bad(val);
+    const chip = document.createElement('span');
+    chip.style.cssText = `
+      display:inline-flex;align-items:center;gap:.25rem;
+      padding:.25rem .55rem;border-radius:6px;font-size:.75rem;font-weight:600;
+      background:${isBad ? '#fef2f2' : '#f0fdf4'};
+      color:${isBad ? '#991b1b' : '#166534'};
+      border:1px solid ${isBad ? '#fecaca' : '#bbf7d0'};
+    `;
+    chip.textContent = `${m.icon} ${m.label}: ${val}`;
+    chips.appendChild(chip);
+  }
+
+  container.style.display = 'block';
 }
 
 
@@ -155,21 +212,48 @@ gi('btn-find-route').addEventListener('click', async () => {
 gi('btn-clear-route').addEventListener('click', () => {
   routeL.clearLayers();
   S.routePoly = null;
+  S.routeGlow = null;
   hideRI();
   sessionStorage.removeItem('eq_route');
   toast('Маршрутът е изчистен.');
 });
 
 
-/* ── Смяна на профил → обнови филтри ─────────────────────── */
+/* ── Смяна на профил → моментална смяна на цвят + нов маршрут */
 document.querySelectorAll('input[name="user-profile"]').forEach(r => {
-  r.addEventListener('change', () => {
-    const d = PFILTERS[r.value] ?? PFILTERS.general;
+  r.addEventListener('change', async () => {
+    const p = r.value;
+    const d = PFILTERS[p] ?? PFILTERS.general;
     Object.entries(d).forEach(([id, v]) => { const el = gi(id); if (el) el.checked = v; });
+
+    // 1. Моментална смяна на цвета на всички слоеве (главен + алтернативи)
+    const newColor = PCOLORS[p] || '#1e9e75';
     if (S.routePoly) {
-      const ci = calcCI();
-      gi('route-comfort-score').textContent = ci;
-      updateDots(ci);
+      S.routePoly.setStyle({ color: newColor });
+      if (S.routeGlow) S.routeGlow.setStyle({ color: newColor });
+    }
+    routeL.eachLayer(layer => {
+      if (layer !== S.routePoly && layer !== S.routeGlow && layer.setStyle) {
+        layer.setStyle({ color: newColor });
+      }
+    });
+
+    // 2. Преизчисляване на маршрута с новия профил (фоново)
+    if (S.from && S.to && S.routePoly) {
+      const btn = gi('btn-find-route');
+      btn.disabled = true;
+      btn.innerHTML = '🔄 &nbsp;Преизчисляване...';
+      try {
+        const data = await fetchRouteFromBackend(S.from, S.to);
+        renderRoute(data);
+        toast(`✅ Маршрут за ${PLABELS[p] || p} · CI ${data.comfort_index}/10`);
+      } catch (err) {
+        console.error('[EqualPath] Profile reroute:', err);
+        toast(`⚠️ ${err.message}`);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '🧭 &nbsp;Намери маршрут';
+      }
     }
   });
 });

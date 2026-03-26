@@ -28,11 +28,11 @@ async function checkBackend() {
     const r = await fetch(`${API_BASE}/api/health`, { signal: AbortSignal.timeout(3000) });
     if (!r.ok) throw new Error();
     const d = await r.json();
-    const geminiOk = d.gemini === 'configured';
-    gi('bb-dot').style.background          = geminiOk ? '#22c55e' : '#f59e0b';
-    gi('bb-text').textContent              = geminiOk ? 'AI онлайн' : 'AI – няма ключ';
-    gi('backend-badge').style.borderColor  = geminiOk ? '#86efac' : '#fde68a';
-    gi('backend-badge').style.color        = geminiOk ? '#15803d' : '#92400e';
+    const aiOk = d.ai === 'configured';
+    gi('bb-dot').style.background          = aiOk ? '#22c55e' : '#f59e0b';
+    gi('bb-text').textContent              = aiOk ? 'AI онлайн' : 'AI – няма ключ';
+    gi('backend-badge').style.borderColor  = aiOk ? '#86efac' : '#fde68a';
+    gi('backend-badge').style.color        = aiOk ? '#15803d' : '#92400e';
     return true;
   } catch {
     gi('bb-dot').style.background         = '#ef4444';

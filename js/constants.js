@@ -37,6 +37,50 @@ const PICONS = {
   visual: '🦯', elderly: '🧓', general: '🚶',
 };
 
+/* ── Цветове на маршрута по профил ─────────────────────────── */
+const PCOLORS = {
+  wheelchair: '#059669',
+  autism:     '#6366f1',
+  stroller:   '#d97706',
+  visual:     '#2563eb',
+  elderly:    '#7c3aed',
+  general:    '#1e9e75',
+};
+
+/* ── Кои метрики са най-важни за всеки профил (за UI) ────── */
+const PMETRICS = {
+  wheelchair: [
+    { key: 'stairs_segments',  icon: '🚫', label: 'Стълби',   bad: v => v > 0 },
+    { key: 'cobble_segments',  icon: '🧱', label: 'Павета',   bad: v => v > 0 },
+    { key: 'smooth_surface',   icon: '✅', label: 'Гладък път', bad: v => v === 0, invert: true },
+  ],
+  autism: [
+    { key: 'busy_roads_nearby', icon: '🔇', label: 'Шумни улици', bad: v => v > 2 },
+    { key: 'parks_nearby',      icon: '🌿', label: 'Паркове',      bad: v => v === 0, invert: true },
+    { key: 'significant_turns', icon: '🔄', label: 'Завои',        bad: v => v > 5 },
+  ],
+  stroller: [
+    { key: 'stairs_segments',  icon: '🚫', label: 'Стълби',   bad: v => v > 0 },
+    { key: 'cobble_segments',  icon: '🧱', label: 'Павета',   bad: v => v > 0 },
+    { key: 'smooth_surface',   icon: '✅', label: 'Гладък път', bad: v => v === 0, invert: true },
+  ],
+  visual: [
+    { key: 'tactile_paving',   icon: '⬛', label: 'Тактилна настилка', bad: v => v === 0, invert: true },
+    { key: 'safe_crossings',   icon: '🚦', label: 'Светофари',         bad: v => v === 0, invert: true },
+    { key: 'unlit_segments',   icon: '💡', label: 'Тъмни участъци',    bad: v => v > 0 },
+  ],
+  elderly: [
+    { key: 'steep_segments',   icon: '⛰️', label: 'Стръмни',   bad: v => v > 0 },
+    { key: 'benches_nearby',   icon: '🪑', label: 'Пейки',     bad: v => v === 0, invert: true },
+    { key: 'parks_nearby',     icon: '🌿', label: 'Паркове',   bad: v => v === 0, invert: true },
+  ],
+  general: [
+    { key: 'stairs_segments',  icon: '🚫', label: 'Стълби',    bad: v => v > 0 },
+    { key: 'unlit_segments',   icon: '💡', label: 'Тъмни',     bad: v => v > 0 },
+    { key: 'footway_segments', icon: '🚶', label: 'Пешеходни', bad: v => v === 0, invert: true },
+  ],
+};
+
 /* ── Автоматични филтри по профил ─────────────────────────── */
 const PFILTERS = {
   wheelchair: { 'filter-no-stairs': true,  'filter-no-cobble': true,  'filter-quiet': false, 'filter-no-crowds': false, 'filter-shade': false },

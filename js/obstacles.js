@@ -106,13 +106,17 @@ gi('report-form').addEventListener('submit', async e => {
   btn.disabled = false;
   btn.innerHTML = '✅ Изпрати';
 
-  // Ако има активен маршрут — преизчисли го
+  // Ако има активен маршрут — преизчисли го за да заобиколи препятствието
   if (S.from && S.to && S.routePoly) {
     toast('🔄 Преизчисляване на маршрута...');
     try {
       const data = await fetchRouteFromBackend(S.from, S.to);
       renderRoute(data);
-      toast('✅ Маршрутът е обновен, за да заобиколи препятствието.');
+      if (data.warning && data.warning.includes('препятстви')) {
+        toast('⚠️ ' + data.warning, 5000);
+      } else {
+        toast('✅ Маршрутът е обновен, за да заобиколи препятствието.');
+      }
     } catch (err) { console.warn('Reroute failed:', err); }
   }
 });

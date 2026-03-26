@@ -172,6 +172,7 @@ gi('btn-do-register').addEventListener('click', async () => {
 });
 
 
+
 /* ── logIn / logOut ──────────────────────────────────────── */
 function logIn(user) {
   S.user = user;
