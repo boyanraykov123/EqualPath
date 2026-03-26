@@ -1,2 +1,3 @@
-# EqualPath
-Иновативна уеб навигация, която помага на хора, които се нуждаят от възможно най-удобните маршрути за предвижване.
+# Welcome to your Lovable project
+
+TODO: Document your project here
