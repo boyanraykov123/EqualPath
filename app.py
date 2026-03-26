@@ -7,11 +7,18 @@ Flask сървър с 3 ендпойнта:
 """
 
 import os
+import sys
 import json
 from datetime import datetime
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from dotenv import load_dotenv
+
+# Fix Windows console encoding for Unicode/Cyrillic output
+if sys.stdout.encoding != 'utf-8':
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+if sys.stderr.encoding != 'utf-8':
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 
 from routing import get_candidate_routes
 from ai_scorer import score_routes_with_ai
@@ -33,10 +40,10 @@ CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 @app.route("/api/health", methods=["GET"])
 def health():
-    """Проверка дали сървърът и Gemini са конфигурирани."""
-    gemini_ok = bool(
-        os.getenv("GEMINI_API_KEY") and
-        os.getenv("GEMINI_API_KEY") != "your_gemini_api_key_here"
+    """Проверка дали сървърът и Grok са конфигурирани."""
+    ai_ok = bool(
+        os.getenv("XAI_API_KEY") and
+        os.getenv("XAI_API_KEY") != "your_xai_api_key_here"
     )
     # Проверяваме Supabase връзката
     try:
@@ -50,7 +57,7 @@ def health():
 
     return jsonify({
         "status":    "ok",
-        "gemini":    "configured" if gemini_ok else "missing_api_key",
+        "ai":        "configured" if ai_ok else "missing_api_key",
         "supabase":  supabase_status,
         "reports":   report_count,
         "timestamp": datetime.utcnow().isoformat(),
@@ -135,15 +142,15 @@ def route():
     # ── Стъпка 1: Вземи кандидат-маршрути от OSRM + OSM анализ ───────────────
     try:
         print("[route] Стъпка 1: Взимам маршрути от OSRM + OSM анализ...")
-        candidates = get_candidate_routes(from_lat, from_lon, to_lat, to_lon)
+        candidates = get_candidate_routes(from_lat, from_lon, to_lat, to_lon, profile, needs)
         print(f"[route] Намерени {len(candidates)} кандидат-маршрути")
     except Exception as e:
         print(f"[route] OSRM/OSM грешка: {e}")
         return jsonify({"ok": False, "error": str(e)}), 502
 
-    # ── Стъпка 2: AI scoring с Gemini ────────────────────────────────────────
+    # ── Стъпка 2: AI scoring с Grok ────────────────────────────────────────
     try:
-        print("[route] Стъпка 2: AI scoring с Gemini...")
+        print("[route] Стъпка 2: AI scoring с Grok...")
         result = score_routes_with_ai(candidates, profile, needs, notes)
         print(f"[route] AI избра маршрут {result['chosen_route_index']} | CI={result['comfort_index']}")
     except Exception as e:
@@ -153,7 +160,7 @@ def route():
     # ── Стъпка 3: Подготви отговора ───────────────────────────────────────────
     chosen = result["chosen_route"]
 
-    # Алтернативите — без пълния geojson (спестяваме bandwidth)
+    # Алтернативите — с geojson за показване на картата
     alternatives = []
     for c in candidates:
         if c["index"] != chosen["index"]:
@@ -162,6 +169,8 @@ def route():
                 "distance_km":  c["distance_km"],
                 "duration_min": c["duration_min"],
                 "osm_summary":  _osm_summary(c["osm"]),
+                "geojson":      c["geojson"],
+                "scores":       c.get("scores", {}),
             })
 
     response = {
@@ -174,6 +183,8 @@ def route():
         "warning":       result["warning"],
         "route_summary": result["route_summary"],
         "osm_data":      chosen["osm"],
+        "scores":        chosen.get("scores", {}),
+        "profile":       profile,
         "alternatives":  alternatives,
     }
 
@@ -253,23 +264,33 @@ def create_report():
         report["latitude"]  = float(latlng["lat"])
         report["longitude"] = float(latlng["lng"])
 
-    # Потребител (по избор)
+    # Потребител (по избор) — проверяваме дали профилът съществува
     if body.get("user_id"):
-        report["user_id"] = body["user_id"]
+        try:
+            db_check = get_db()
+            profile_check = db_check.table("profiles").select("user_id").eq("user_id", body["user_id"]).execute()
+            if profile_check.data:
+                report["user_id"] = body["user_id"]
+            else:
+                print(f"[reports] user_id {body['user_id']} not in profiles, skipping")
+        except Exception:
+            print(f"[reports] Could not verify user_id, skipping")
 
     # Снимка (по избор)
     if body.get("photo_url"):
         report["photo_url"] = body["photo_url"]
 
+    print(f"[reports] Inserting report: {report}")
     try:
         db = get_db()
         result = db.table("reports").insert(report).execute()
         new_id = result.data[0]["id"]
     except Exception as e:
-        print(f"[reports] Supabase грешка: {e}")
-        return jsonify({"ok": False, "error": f"Грешка при запис: {e}"}), 500
+        print(f"[reports] Supabase error: {e}")
+        print(f"[reports] Report data was: {report}")
+        return jsonify({"ok": False, "error": f"Grеshka pri zapis: {e}"}), 500
 
-    print(f"[reports] Нов доклад {new_id}: {report['type']} @ {report['location']}")
+    print(f"[reports] New report {new_id}: {report['type']}")
     return jsonify({"ok": True, "id": new_id})
 
 
@@ -375,29 +396,31 @@ def chat():
         return jsonify({"ok": False, "error": "Липсва съобщение."}), 400
 
     try:
-        import google.generativeai as genai
-        genai.configure(api_key=os.getenv("GEMINI_API_KEY", ""))
-        model = genai.GenerativeModel("gemini-2.5-flash")
+        from openai import OpenAI
+        client = OpenAI(
+            api_key=os.getenv("XAI_API_KEY", ""),
+            base_url="https://api.x.ai/v1",
+        )
 
-        prompt = f"""Ти си AI асистент на EqualPath — приложение за достъпна градска навигация за хора с увреждания, детски колички, възрастни хора и др.
+        system_prompt = """Ти си AI асистент на EqualPath — приложение за достъпна градска навигация за хора с увреждания, детски колички, възрастни хора и др.
 
 Отговаряй кратко и полезно на български. Можеш да помагаш с:
 - Информация за достъпни маршрути
 - Съвети за навигация с инвалидна количка, детска количка и др.
 - Обяснения как работи приложението
 - Информация за препятствия и как да ги докладваш
-- Общи въпроси за достъпност в градска среда
+- Общи въпроси за достъпност в градска среда"""
 
-Потребителят пита: {message}"""
-
-        response = model.generate_content(
-            prompt,
-            generation_config=genai.types.GenerationConfig(
-                temperature=0.7,
-                max_output_tokens=1024,
-            ),
+        response = client.chat.completions.create(
+            model="grok-3-mini",
+            max_tokens=1024,
+            temperature=0.7,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": message},
+            ],
         )
-        reply = response.text.strip()
+        reply = response.choices[0].message.content.strip()
     except Exception as e:
         print(f"[chat] AI грешка: {e}")
         reply = "Извинявам се, в момента не мога да отговоря. Моля, опитай отново по-късно."
@@ -430,20 +453,15 @@ def internal_error(e):
 
 if __name__ == "__main__":
     port = int(os.getenv("FLASK_PORT", 5000))
-    print(f"""
-╔══════════════════════════════════════════╗
-║   EqualPath Backend  v1.0                ║
-║   http://localhost:{port}                  ║
-║                                          ║
-║   POST /api/route         ← маршрути    ║
-║   POST /api/reports       ← доклади     ║
-║   GET  /api/reports       ← виж доклади ║
-║   GET  /api/routes/:uid   ← история     ║
-║   POST /api/profiles      ← профил      ║
-║   GET  /api/profiles/:uid ← виж профил  ║
-║   GET  /api/health        ← статус      ║
-╚══════════════════════════════════════════╝
-""")
+    print(f"\n  EqualPath Backend v1.0")
+    print(f"  http://localhost:{port}\n")
+    print(f"  POST /api/route         <- route")
+    print(f"  POST /api/reports       <- report")
+    print(f"  GET  /api/reports       <- get reports")
+    print(f"  GET  /api/routes/:uid   <- history")
+    print(f"  POST /api/profiles      <- profile")
+    print(f"  GET  /api/profiles/:uid <- get profile")
+    print(f"  GET  /api/health        <- status\n")
     app.run(
         host="0.0.0.0",
         port=port,

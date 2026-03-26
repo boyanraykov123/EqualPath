@@ -7,9 +7,15 @@ routing.py — EqualPath
   3. Връща структурирани данни за AI scorer-а
 """
 
+import sys
 import requests
 import math
 from db import get_db
+
+if sys.stdout.encoding != 'utf-8':
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+if sys.stderr.encoding != 'utf-8':
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 
 # ── External API endpoints ────────────────────────────────────────────────────
 OSRM_BASE     = "https://routing.openstreetmap.de/routed-foot/route/v1/foot"
@@ -145,8 +151,13 @@ def build_overpass_query(bbox):
   way["highway"="cycleway"]["foot"="yes"]({bb});
   node["amenity"="bench"]({bb});
   node["amenity"="toilets"]["wheelchair"!="no"]({bb});
+  way["highway"~"^(primary|secondary|tertiary|trunk)$"]({bb});
+  way["leisure"~"^(park|garden)$"]({bb});
+  way["tactile_paving"="yes"]["highway"~"^(footway|path|pedestrian|crossing)$"]({bb});
+  node["crossing"="traffic_signals"]({bb});
+  way["surface"~"^(asphalt|paving_stones|concrete)$"]["highway"~"^(footway|path|pedestrian)$"]({bb});
 );
-out body;
+out body bb;
 """.strip()
 
 
@@ -217,6 +228,32 @@ def count_near_route(elements, route_coords, element_type, tag_filter, radius=30
     return count
 
 
+def count_significant_turns(coords, min_angle=60):
+    """Брои значими промени на посоката (завои > min_angle градуса)."""
+    if len(coords) < 3:
+        return 0
+    sampled = [coords[0]]
+    for c in coords[1:]:
+        if haversine(sampled[-1][1], sampled[-1][0], c[1], c[0]) >= 50:
+            sampled.append(c)
+    if len(sampled) < 3:
+        return 0
+    turns = 0
+    for i in range(1, len(sampled) - 1):
+        dx1 = sampled[i][0] - sampled[i-1][0]
+        dy1 = sampled[i][1] - sampled[i-1][1]
+        dx2 = sampled[i+1][0] - sampled[i][0]
+        dy2 = sampled[i+1][1] - sampled[i][1]
+        cross = dx1 * dy2 - dy1 * dx2
+        dot = dx1 * dx2 + dy1 * dy2
+        if dot == 0 and cross == 0:
+            continue
+        angle = abs(math.degrees(math.atan2(cross, dot)))
+        if angle >= min_angle:
+            turns += 1
+    return turns
+
+
 def analyze_route_osm(route):
     """
     Пълен OSM анализ за един маршрут.
@@ -265,6 +302,24 @@ def analyze_route_osm(route):
         tags = el.get("tags", {})
         return tags.get("amenity") == "toilets" and tags.get("wheelchair") != "no"
 
+    def is_busy_road(el):
+        return el.get("tags", {}).get("highway") in ("primary", "secondary", "tertiary", "trunk")
+
+    def is_park(el):
+        return el.get("tags", {}).get("leisure") in ("park", "garden")
+
+    def is_tactile(el):
+        tags = el.get("tags", {})
+        return tags.get("tactile_paving") == "yes" and tags.get("highway") in ("footway", "path", "pedestrian", "crossing")
+
+    def is_safe_crossing(el):
+        return el.get("tags", {}).get("crossing") == "traffic_signals"
+
+    def is_smooth_surface(el):
+        tags = el.get("tags", {})
+        return (tags.get("surface") in ("asphalt", "paving_stones", "concrete") and
+                tags.get("highway") in ("footway", "path", "pedestrian"))
+
     # ── Броене ────────────────────────────────────────────────────────────────
     stairs_count   = count_near_route(elements, sampled, "way",  is_stairs,   radius=25)
     cobble_count   = count_near_route(elements, sampled, "way",  is_cobble,   radius=25)
@@ -274,13 +329,19 @@ def analyze_route_osm(route):
     footway_count  = count_near_route(elements, sampled, "way",  is_footway,  radius=20)
     bench_count    = count_near_route(elements, sampled, "node", is_bench,    radius=50)
     toilet_count   = count_near_route(elements, sampled, "node", is_toilet,   radius=100)
+    busy_road_count  = count_near_route(elements, sampled, "way",  is_busy_road,      radius=50)
+    park_count       = count_near_route(elements, sampled, "way",  is_park,           radius=50)
+    tactile_count    = count_near_route(elements, sampled, "way",  is_tactile,        radius=25)
+    safe_cross_count = count_near_route(elements, sampled, "node", is_safe_crossing,  radius=30)
+    smooth_count     = count_near_route(elements, sampled, "way",  is_smooth_surface, radius=25)
+    turns_count      = count_significant_turns(all_coords)
 
     # ── Нормализирани оценки (0.0 – 1.0, по-ниско = по-лошо) ─────────────────
     distance_km  = route["distance"] / 1000
     duration_min = route["duration"] / 60
 
     # Повече стълби → по-лошо
-    stairs_score   = max(0.0, 1.0 - stairs_count * 0.3)
+    stairs_score   = max(0.0, 1.0 - stairs_count * 0.7)
     # Повече павета → по-лошо
     cobble_score   = max(0.0, 1.0 - cobble_count * 0.2)
     # Повече лоши бордюри → по-лошо
@@ -295,6 +356,18 @@ def analyze_route_osm(route):
     bench_score    = min(1.0, bench_count * 0.15)
     # Тоалетни → бонус
     toilet_score   = min(1.0, toilet_count * 0.3)
+    # Шум: повече натоварени улици → по-лошо (за аутизъм/сензорно)
+    noise_score      = max(0.0, 1.0 - busy_road_count * 0.3)
+    # Сложност: повече завои → по-лошо (за аутизъм)
+    complexity_score = max(0.0, 1.0 - turns_count * 0.05)
+    # Зелени площи → по-добре (за аутизъм/възрастни)
+    green_score      = min(1.0, park_count * 0.2)
+    # Безопасни кръстовища → по-добре (за зрително затруднени)
+    crossing_score   = min(1.0, safe_cross_count * 0.15)
+    # Гладка настилка → по-добре (за количка/детска количка)
+    smooth_score     = min(1.0, smooth_count * 0.1)
+    # Тактилна настилка → по-добре (за зрително затруднени)
+    tactile_score    = min(1.0, tactile_count * 0.2)
 
     return {
         # Основни данни
@@ -315,6 +388,12 @@ def analyze_route_osm(route):
             "footway_segments": footway_count,
             "benches_nearby":   bench_count,
             "accessible_toilets_nearby": toilet_count,
+            "busy_roads_nearby":    busy_road_count,
+            "parks_nearby":         park_count,
+            "tactile_paving":       tactile_count,
+            "safe_crossings":       safe_cross_count,
+            "smooth_surface":       smooth_count,
+            "significant_turns":    turns_count,
         },
 
         # Нормализирани оценки за AI
@@ -327,6 +406,12 @@ def analyze_route_osm(route):
             "footways": round(footway_score, 2),
             "benches":  round(bench_score, 2),
             "toilets":  round(toilet_score, 2),
+            "noise":      round(noise_score, 2),
+            "complexity": round(complexity_score, 2),
+            "green":      round(green_score, 2),
+            "crossings":  round(crossing_score, 2),
+            "smooth":     round(smooth_score, 2),
+            "tactile":    round(tactile_score, 2),
         },
     }
 
@@ -344,16 +429,19 @@ def fetch_active_obstacles():
         return []
 
 
-def count_obstacles_near_route(obstacles, route_coords, radius=50):
+def count_obstacles_near_route(obstacles, route_coords, radius=80):
     """
     Брои препятствия от DB, които са в радиус от маршрута.
+    Проверява ВСИЧКИ координати на маршрута (не sample) за точност.
     Връща (count, list_of_nearby_obstacles).
     """
-    sampled = sample_coords(route_coords, max_points=40)
     nearby = []
     for obs in obstacles:
-        for c in sampled:
+        min_dist = float('inf')
+        for c in route_coords:
             dist = haversine(obs["latitude"], obs["longitude"], c[1], c[0])
+            if dist < min_dist:
+                min_dist = dist
             if dist <= radius:
                 nearby.append({
                     "type": obs["type"],
@@ -362,46 +450,359 @@ def count_obstacles_near_route(obstacles, route_coords, radius=50):
                     "distance_m": round(dist),
                 })
                 break
+        if min_dist > radius:
+            print(f"[obstacles] Препятствие {obs.get('type','?')} е на {min_dist:.0f}м от маршрута (извън радиус {radius}м)")
     return len(nearby), nearby
+
+
+# ── Avoidance routing ────────────────────────────────────────────────────────
+
+def _find_obstacles_near_routes(obstacles, routes, radius=80):
+    """Намира кои препятствия са близо до поне един от маршрутите."""
+    nearby = []
+    seen = set()
+    for route in routes:
+        for obs in obstacles:
+            oid = obs.get("id", id(obs))
+            if oid in seen:
+                continue
+            # Проверяваме с ВСИЧКИ координати, не със sample
+            for c in route["coords"]:
+                if haversine(obs["latitude"], obs["longitude"], c[1], c[0]) <= radius:
+                    nearby.append(obs)
+                    seen.add(oid)
+                    break
+    return nearby
+
+
+def get_avoidance_routes(from_lat, from_lon, to_lat, to_lon, nearby_obstacles, original_routes, next_index):
+    """
+    Генерира OSRM маршрути, които заобикалят препятствия.
+    Използва 3-точков detour по геометрията на оригиналния маршрут:
+      точка ПРЕДИ препятствието → отместена точка → точка СЛЕД препятствието
+    Това принуждава OSRM да напусне улицата с препятствието.
+    """
+    if not nearby_obstacles or not original_routes:
+        return []
+
+    avoidance = []
+    seen_keys = set()
+
+    # Използваме първия (най-кратък) маршрут като reference
+    ref_coords = original_routes[0]["coords"]  # [[lon, lat], ...]
+
+    for obs in nearby_obstacles[:3]:
+        obs_lat, obs_lon = obs["latitude"], obs["longitude"]
+
+        # 1. Намираме най-близката точка на маршрута до препятствието
+        min_dist = float('inf')
+        nearest_idx = 0
+        for i, c in enumerate(ref_coords):
+            d = haversine(obs_lat, obs_lon, c[1], c[0])
+            if d < min_dist:
+                min_dist = d
+                nearest_idx = i
+
+        if min_dist > 150:
+            print(f"[avoidance] Препятствие твърде далеч от маршрута ({min_dist:.0f}м), пропускам")
+            continue
+
+        print(f"[avoidance] Препятствие на {min_dist:.0f}м от маршрут точка {nearest_idx}/{len(ref_coords)}")
+
+        # 2. Намираме точки ~200м ПРЕДИ и СЛЕД препятствието по маршрута
+        before_idx = nearest_idx
+        while before_idx > 1:
+            before_idx -= 1
+            d = haversine(ref_coords[before_idx][1], ref_coords[before_idx][0], obs_lat, obs_lon)
+            if d >= 200:
+                break
+
+        after_idx = nearest_idx
+        while after_idx < len(ref_coords) - 2:
+            after_idx += 1
+            d = haversine(ref_coords[after_idx][1], ref_coords[after_idx][0], obs_lat, obs_lon)
+            if d >= 200:
+                break
+
+        before_pt = ref_coords[before_idx]  # [lon, lat]
+        after_pt = ref_coords[after_idx]    # [lon, lat]
+
+        # 3. Посока на маршрута при препятствието (за перпендикулярен offset)
+        look_back = max(0, nearest_idx - 5)
+        look_fwd = min(len(ref_coords) - 1, nearest_idx + 5)
+        dx = ref_coords[look_fwd][0] - ref_coords[look_back][0]
+        dy = ref_coords[look_fwd][1] - ref_coords[look_back][1]
+        seg_len = math.sqrt(dx ** 2 + dy ** 2)
+
+        if seg_len == 0:
+            continue
+
+        # Перпендикулярен единичен вектор спрямо ПОСОКАТА НА МАРШРУТА
+        perp_dx = -dy / seg_len  # отместване по lon
+        perp_dy = dx / seg_len   # отместване по lat
+
+        # 4. Генерираме detour маршрути с различни отмествания
+        for offset_deg in [0.0015, 0.003, 0.005]:  # ~150м, ~300м, ~500м
+            for direction in [1, -1]:  # ляво/дясно
+                detour_lat = obs_lat + direction * perp_dy * offset_deg
+                detour_lon = obs_lon + direction * perp_dx * offset_deg
+
+                wp_key = (round(detour_lat, 4), round(detour_lon, 4))
+                if wp_key in seen_keys:
+                    continue
+                seen_keys.add(wp_key)
+
+                # 3-точков detour: before → offset → after
+                waypoints = (
+                    f"{from_lon},{from_lat};"
+                    f"{before_pt[0]},{before_pt[1]};"
+                    f"{detour_lon},{detour_lat};"
+                    f"{after_pt[0]},{after_pt[1]};"
+                    f"{to_lon},{to_lat}"
+                )
+                url = (
+                    f"{OSRM_BASE}/{waypoints}"
+                    f"?overview=full&geometries=geojson&alternatives=false"
+                    f"&steps=true&annotations=false"
+                )
+
+                try:
+                    resp = requests.get(url, headers=HEADERS, timeout=12)
+                    resp.raise_for_status()
+                    data = resp.json()
+                    if data.get("code") != "Ok" or not data.get("routes"):
+                        continue
+
+                    r = data["routes"][0]
+                    idx = next_index + len(avoidance)
+                    new_dist_km = round(r["distance"] / 1000, 2)
+                    avoidance.append({
+                        "index":    idx,
+                        "geojson":  r["geometry"],
+                        "coords":   r["geometry"]["coordinates"],
+                        "distance": r["distance"],
+                        "duration": r["duration"],
+                        "legs":     r.get("legs", []),
+                    })
+                    print(f"[avoidance] Генериран маршрут {idx}: {new_dist_km}км (offset={offset_deg}, dir={direction})")
+                except Exception as e:
+                    print(f"[avoidance] OSRM грешка за offset={offset_deg}, dir={direction}: {e}")
+                    continue
+
+    print(f"[avoidance] Общо генерирани {len(avoidance)} avoidance маршрута")
+    return avoidance
+
+
+# ── Анализ на един маршрут ───────────────────────────────────────────────────
+
+def _analyze_one_route(route, obstacles):
+    """Анализира един маршрут с OSM данни и проверява за препятствия."""
+    try:
+        result = analyze_route_osm(route)
+    except Exception as e:
+        print(f"[routing] Грешка при анализ на маршрут {route['index']}: {e}")
+        result = {
+            "index":       route["index"],
+            "geojson":     route["geojson"],
+            "distance_m":  route["distance"],
+            "duration_s":  route["duration"],
+            "distance_km": round(route["distance"] / 1000, 2),
+            "duration_min": round(route["duration"] / 60, 1),
+            "osm":    {k: 0 for k in ["stairs_segments","cobble_segments","bad_kerbs","steep_segments","unlit_segments","footway_segments","benches_nearby","accessible_toilets_nearby","busy_roads_nearby","parks_nearby","tactile_paving","safe_crossings","smooth_surface","significant_turns"]},
+            "scores": {k: 0.5 for k in ["stairs","cobble","kerbs","steep","lighting","footways","benches","toilets","noise","complexity","green","crossings","smooth","tactile"]},
+        }
+
+    obs_count, obs_nearby = count_obstacles_near_route(obstacles, route["coords"])
+    result["osm"]["reported_obstacles"] = obs_count
+    result["obstacles_nearby"] = obs_nearby
+    result["scores"]["obstacles"] = round(max(0.0, 1.0 - obs_count * 0.4), 2)
+    return result
+
+
+# ── Profile-specific route generation ─────────────────────────────────────────
+
+# Какво да търсим в Overpass за всеки профил (за генериране на waypoints)
+_PROFILE_OVERPASS = {
+    "autism": """
+        way["leisure"~"^(park|garden)$"]({bb});
+        way["landuse"="grass"]({bb});
+        way["natural"="wood"]({bb});
+        way["highway"="residential"]["maxspeed"~"^(20|30)$"]({bb});
+    """,
+    "wheelchair": """
+        way["surface"~"^(asphalt|paving_stones|concrete)$"]["highway"~"^(footway|path|pedestrian)$"]({bb});
+        way["wheelchair"="yes"]({bb});
+    """,
+    "stroller": """
+        way["surface"~"^(asphalt|paving_stones|concrete)$"]["highway"~"^(footway|path|pedestrian)$"]({bb});
+    """,
+    "visual": """
+        way["lit"="yes"]["highway"~"^(footway|path|pedestrian|residential)$"]({bb});
+        way["tactile_paving"="yes"]({bb});
+    """,
+    "elderly": """
+        way["leisure"~"^(park|garden)$"]({bb});
+        node["amenity"="bench"]({bb});
+    """,
+}
+
+
+def _query_profile_waypoints(from_lat, from_lon, to_lat, to_lon, profile):
+    """Търси подходящи waypoint-и за даден профил чрез Overpass."""
+    if profile not in _PROFILE_OVERPASS:
+        return []
+
+    padding = 0.005
+    bbox = {
+        "south": min(from_lat, to_lat) - padding,
+        "north": max(from_lat, to_lat) + padding,
+        "west":  min(from_lon, to_lon) - padding,
+        "east":  max(from_lon, to_lon) + padding,
+    }
+    s, n, w, e = bbox["south"], bbox["north"], bbox["west"], bbox["east"]
+    bb = f"{s},{w},{n},{e}"
+
+    body = _PROFILE_OVERPASS[profile].replace("{bb}", bb)
+    query = f"[out:json][timeout:10];\n({body});\nout center;"
+
+    try:
+        resp = requests.post(OVERPASS_BASE, data={"data": query}, headers=HEADERS, timeout=10)
+        resp.raise_for_status()
+        return resp.json().get("elements", [])
+    except Exception as e:
+        print(f"[profile-routing] Overpass грешка за {profile}: {e}")
+        return []
+
+
+def _osrm_via_waypoint(from_lat, from_lon, to_lat, to_lon, wp_lat, wp_lon):
+    """Праща OSRM заявка с една via-точка. Връща route dict или None."""
+    coords = f"{from_lon},{from_lat};{wp_lon},{wp_lat};{to_lon},{to_lat}"
+    url = (
+        f"{OSRM_BASE}/{coords}"
+        f"?overview=full&geometries=geojson&alternatives=false"
+        f"&steps=true&annotations=false"
+    )
+    try:
+        resp = requests.get(url, headers=HEADERS, timeout=12)
+        resp.raise_for_status()
+        data = resp.json()
+        if data.get("code") != "Ok" or not data.get("routes"):
+            return None
+        r = data["routes"][0]
+        return {
+            "geojson":  r["geometry"],
+            "coords":   r["geometry"]["coordinates"],
+            "distance": r["distance"],
+            "duration": r["duration"],
+            "legs":     r.get("legs", []),
+        }
+    except Exception:
+        return None
+
+
+def _generate_profile_routes(from_lat, from_lon, to_lat, to_lon, profile, next_index):
+    """
+    Генерира профил-специфични маршрути чрез Overpass waypoints
+    (паркове за аутизъм, гладки пътеки за количка, и т.н.).
+    """
+    if profile not in _PROFILE_OVERPASS:
+        return []
+
+    elements = _query_profile_waypoints(from_lat, from_lon, to_lat, to_lon, profile)
+    centers = []
+    for el in elements:
+        if "center" in el:
+            centers.append((el["center"]["lat"], el["center"]["lon"]))
+        elif el.get("lat") and el.get("lon"):
+            centers.append((el["lat"], el["lon"]))
+
+    mid_lat = (from_lat + to_lat) / 2
+    mid_lon = (from_lon + to_lon) / 2
+    centers.sort(key=lambda c: haversine(c[0], c[1], mid_lat, mid_lon))
+
+    routes = []
+    seen_distances = set()
+
+    for wlat, wlon in centers[:6]:
+        if len(routes) >= 4:
+            break
+        if haversine(wlat, wlon, from_lat, from_lon) < 80:
+            continue
+        if haversine(wlat, wlon, to_lat, to_lon) < 80:
+            continue
+        r = _osrm_via_waypoint(from_lat, from_lon, to_lat, to_lon, wlat, wlon)
+        if not r:
+            continue
+        dist_key = round(r["distance"] / 50)
+        if dist_key in seen_distances:
+            continue
+        seen_distances.add(dist_key)
+        idx = next_index + len(routes)
+        r["index"] = idx
+        routes.append(r)
+        print(f"[profile-routing] Маршрут {idx} (overpass-{profile}): {round(r['distance']/1000,2)}км")
+
+    print(f"[profile-routing] Общо {len(routes)} допълнителни маршрута за '{profile}'")
+    return routes
 
 
 # ── Main entrypoint ───────────────────────────────────────────────────────────
 
-def get_candidate_routes(from_lat, from_lon, to_lat, to_lon):
+def get_candidate_routes(from_lat, from_lon, to_lat, to_lon, profile="general", needs=None):
     """
     Главна функция — взима маршрути от OSRM и анализира всеки с OSM.
+    Генерира профил-специфични алтернативни маршрути (през паркове за аутизъм,
+    по гладки пътеки за количка, и т.н.).
     Зарежда активни препятствия от DB и ги добавя към анализа.
+    Ако всички маршрути минават през препятствия — генерира допълнителни
+    avoidance маршрути с via-waypoints, за да ги заобиколи.
     Връща списък от анализирани маршрути, готови за AI scorer.
     """
+    if needs is None:
+        needs = []
+
     routes = get_osrm_routes(from_lat, from_lon, to_lat, to_lon, alternatives=3)
+
+    # Профил-специфични допълнителни маршрути от Overpass
+    profile_routes = _generate_profile_routes(
+        from_lat, from_lon, to_lat, to_lon, profile, next_index=len(routes)
+    )
+    routes.extend(profile_routes)
+
+    print(f"[routing] {len(routes)} кандидат-маршрута (OSRM + profile)")
+
     obstacles = fetch_active_obstacles()
-    if obstacles:
-        print(f"[routing] Заредени {len(obstacles)} активни препятствия от DB")
+    print(f"[routing] Заредени {len(obstacles)} активни препятствия от DB")
 
-    analyzed = []
-    for route in routes:
-        try:
-            result = analyze_route_osm(route)
-        except Exception as e:
-            print(f"[routing] Грешка при анализ на маршрут {route['index']}: {e}")
-            result = {
-                "index":       route["index"],
-                "geojson":     route["geojson"],
-                "distance_m":  route["distance"],
-                "duration_s":  route["duration"],
-                "distance_km": round(route["distance"] / 1000, 2),
-                "duration_min": round(route["duration"] / 60, 1),
-                "osm":    {k: 0 for k in ["stairs_segments","cobble_segments","bad_kerbs","steep_segments","unlit_segments","footway_segments","benches_nearby","accessible_toilets_nearby"]},
-                "scores": {k: 0.5 for k in ["stairs","cobble","kerbs","steep","lighting","footways","benches","toilets"]},
-            }
+    analyzed = [_analyze_one_route(route, obstacles) for route in routes]
 
-        # Добавяме информация за препятствия от DB
-        obs_count, obs_nearby = count_obstacles_near_route(obstacles, route["coords"])
-        result["osm"]["reported_obstacles"] = obs_count
-        result["obstacles_nearby"] = obs_nearby
-        # Препятствията намаляват score-а значително
-        result["scores"]["obstacles"] = round(max(0.0, 1.0 - obs_count * 0.4), 2)
+    # Ако поне един маршрут минава през препятствие → генерираме avoidance
+    any_has_obstacles = any(r["osm"].get("reported_obstacles", 0) > 0 for r in analyzed)
 
-        analyzed.append(result)
+    if any_has_obstacles:
+        has_clean = any(r["osm"].get("reported_obstacles", 0) == 0 for r in analyzed)
+        if has_clean:
+            print("[routing] Има чист маршрут сред OSRM алтернативите — ще бъде избран от AI scorer")
+        else:
+            print("[routing] ВСИЧКИ OSRM маршрути минават през препятствия — генерирам avoidance...")
+            nearby_obs = _find_obstacles_near_routes(obstacles, routes)
+            print(f"[avoidance] Намерени {len(nearby_obs)} препятствия близо до маршрутите")
+            avoidance_routes = get_avoidance_routes(
+                from_lat, from_lon, to_lat, to_lon,
+                nearby_obs, routes, next_index=len(routes)
+            )
+            for route in avoidance_routes:
+                result = _analyze_one_route(route, obstacles)
+                route_obs = result["osm"].get("reported_obstacles", 0)
+                analyzed.append(result)
+                status = "✓ ЧИСТ" if route_obs == 0 else f"⚠ {route_obs} препятствия"
+                print(f"[avoidance] Маршрут {result['index']}: {result['distance_km']}км — {status}")
+
+    # Логваме финалното разпределение
+    print(f"\n[routing] ══ {len(analyzed)} кандидат-маршрута ══")
+    for r in analyzed:
+        obs = r["osm"].get("reported_obstacles", 0)
+        marker = "✓" if obs == 0 else "✗"
+        print(f"[routing] {marker} Маршрут {r['index']}: {r['distance_km']}км, {obs} препятстви{'е' if obs == 1 else 'я'}, obstacle_score={r['scores'].get('obstacles', '?')}")
 
     return analyzed
