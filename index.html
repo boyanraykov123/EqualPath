@@ -170,7 +170,7 @@
     <div id="panel-login" class="auth-panel active">
       <h2 class="modal-title">Добре дошъл обратно 👋</h2>
       <p class="modal-subtitle">Влез в профила си и продължи от там, където си спрял.</p>
-      <div style="display:flex;flex-direction:column;gap:.875rem">
+      <form id="login-form" style="display:flex;flex-direction:column;gap:.875rem">
         <div>
           <label class="form-label" for="login-email">Имейл</label>
           <input type="email" id="login-email" class="form-input" placeholder="тебе@пример.бг"/>
@@ -185,9 +185,9 @@
           <p class="form-error" id="login-pw-err"></p>
         </div>
         <p class="form-error" id="login-gen-err" style="text-align:center"></p>
-        <button class="btn-full" id="btn-do-login">Вход →</button>
+        <button class="btn-full" id="btn-do-login" type="submit">Вход →</button>
         <p style="text-align:center;font-size:.8rem;color:var(--ink-muted)">Нямаш профил? <button id="to-register" style="background:none;border:none;color:var(--brand);font-weight:600;cursor:pointer;font-size:.8rem">Регистрирай се</button></p>
-      </div>
+      </form>
     </div>
 
     <!-- REGISTER -->
@@ -203,7 +203,7 @@
       <div class="onboarding-step active" id="reg-s1">
         <h2 class="modal-title">Създай профил ✨</h2>
         <p class="modal-subtitle">Само 3 бързи стъпки и сме готови.</p>
-        <div style="display:flex;flex-direction:column;gap:.875rem">
+        <form id="reg-form-s1" style="display:flex;flex-direction:column;gap:.875rem">
           <div>
             <label class="form-label" for="reg-name">Твоето ime</label>
             <input type="text" id="reg-name" class="form-input" placeholder="Иван Иванов"/>
@@ -223,9 +223,9 @@
             <p class="form-error" id="reg-pw-err"></p>
           </div>
           <p class="form-error" id="reg-s1-err" style="text-align:center"></p>
-          <button class="btn-full" id="reg-next-1">Напред →</button>
+          <button class="btn-full" id="reg-next-1" type="submit">Напред →</button>
           <p style="text-align:center;font-size:.8rem;color:var(--ink-muted)">Вече имаш профил? <button id="to-login" style="background:none;border:none;color:var(--brand);font-weight:600;cursor:pointer;font-size:.8rem">Влез</button></p>
-        </div>
+        </form>
       </div>
 
       <!-- Step 2 -->

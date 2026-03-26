@@ -64,7 +64,8 @@ gi('to-login').addEventListener('click', () => switchTab('login'));
 
 
 /* ── Вход (Login) ────────────────────────────────────────── */
-gi('btn-do-login').addEventListener('click', async () => {
+gi('login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
   const email = gi('login-email').value.trim(), pw = gi('login-pw').value;
   clrE('login-email-err'); clrE('login-pw-err'); clrE('login-gen-err');
   let ok = true;
@@ -96,6 +97,11 @@ gi('btn-do-login').addEventListener('click', async () => {
   }
 });
 
+gi('btn-do-login').addEventListener('click', (e) => {
+  e.preventDefault();
+  gi('login-form').dispatchEvent(new Event('submit'));
+});
+
 
 /* ── Регистрация (стъпки) ────────────────────────────────── */
 let regStep = 1;
@@ -111,14 +117,20 @@ function showStep(n) {
   gi('step-lbl').textContent = `Стъпка ${n} от 3`;
 }
 
-gi('reg-next-1').addEventListener('click', () => {
+gi('reg-form-s1').addEventListener('submit', (e) => {
+  e.preventDefault();
   const name = gi('reg-name').value.trim(), email = gi('reg-email').value.trim(), pw = gi('reg-pw').value;
   clrE('reg-name-err'); clrE('reg-email-err'); clrE('reg-pw-err'); clrE('reg-s1-err');
   let ok = true;
-  if (!name) { shwE('reg-name-err', 'Въведи твоето иme.'); ok = false; }
+  if (!name) { shwE('reg-name-err', 'Въведи твоето ime.'); ok = false; }
   if (!email || !email.includes('@')) { shwE('reg-email-err', 'Невалиден имейл.'); ok = false; }
   if (pw.length < 8) { shwE('reg-pw-err', 'Паролата трябва да е поне 8 символа.'); ok = false; }
   if (ok) showStep(2);
+});
+
+gi('reg-next-1').addEventListener('click', (e) => {
+  e.preventDefault();
+  gi('reg-form-s1').dispatchEvent(new Event('submit'));
 });
 
 gi('reg-back-2').addEventListener('click', () => showStep(1));
