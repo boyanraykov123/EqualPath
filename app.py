@@ -380,55 +380,6 @@ def get_profile(user_id):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# POST /api/chat  (AI асистент)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-@app.route("/api/chat", methods=["POST"])
-def chat():
-    """AI чат асистент за достъпна навигация."""
-    try:
-        body = request.get_json(force=True)
-    except Exception:
-        return jsonify({"ok": False, "error": "Невалиден JSON."}), 400
-
-    message = str(body.get("message", ""))[:1000]
-    if not message:
-        return jsonify({"ok": False, "error": "Липсва съобщение."}), 400
-
-    try:
-        from openai import OpenAI
-        client = OpenAI(
-            api_key=os.getenv("XAI_API_KEY", ""),
-            base_url="https://api.x.ai/v1",
-        )
-
-        system_prompt = """Ти си AI асистент на EqualPath — приложение за достъпна градска навигация за хора с увреждания, детски колички, възрастни хора и др.
-
-Отговаряй кратко и полезно на български. Можеш да помагаш с:
-- Информация за достъпни маршрути
-- Съвети за навигация с инвалидна количка, детска количка и др.
-- Обяснения как работи приложението
-- Информация за препятствия и как да ги докладваш
-- Общи въпроси за достъпност в градска среда"""
-
-        response = client.chat.completions.create(
-            model="grok-3-mini",
-            max_tokens=1024,
-            temperature=0.7,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": message},
-            ],
-        )
-        reply = response.choices[0].message.content.strip()
-    except Exception as e:
-        print(f"[chat] AI грешка: {e}")
-        reply = "Извинявам се, в момента не мога да отговоря. Моля, опитай отново по-късно."
-
-    return jsonify({"ok": True, "reply": reply})
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
 # Error handlers
 # ═══════════════════════════════════════════════════════════════════════════════
 

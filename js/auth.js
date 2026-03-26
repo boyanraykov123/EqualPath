@@ -158,6 +158,18 @@ gi('btn-do-register').addEventListener('click', async () => {
     if (authErr) throw authErr;
     if (!authData.user) throw new Error('Регистрацията не върна потребител.');
 
+    // Ако има session, значи е потвърден автоматично; иначе опитай да влезеш
+    if (authData.session) {
+      // Потребителят е logged in
+    } else {
+      // Опитай да влезеш ръчно (ако email confirmation е изключен)
+      const { data: signInData, error: signInErr } = await sb.auth.signInWithPassword({ email, password: pw });
+      if (signInErr) {
+        // Ако не може да влезе, покажи съобщение
+        throw new Error('Регистрацията е успешна, но трябва да потвърдите имейла си преди да влезете.');
+      }
+    }
+
     const userId = authData.user.id;
 
     // 2. Профил в profiles таблицата
