@@ -27,14 +27,11 @@ const PLABELS = {
   wheelchair: '♿ Инвалидна количка',
   autism:     '🧠 Аутизъм/Сензорно',
   stroller:   '👶 Детска количка',
-  visual:     '🦯 Зрителни затруднения',
-  elderly:    '🧓 Бавна походка',
   general:    '🚶 Общ пешеходен',
 };
 
 const PICONS = {
-  wheelchair: '♿', autism: '🧠', stroller: '👶',
-  visual: '🦯', elderly: '🧓', general: '🚶',
+  wheelchair: '♿', autism: '🧠', stroller: '👶', general: '🚶',
 };
 
 /* ── Цветове на маршрута по профил ─────────────────────────── */
@@ -42,8 +39,6 @@ const PCOLORS = {
   wheelchair: '#059669',
   autism:     '#6366f1',
   stroller:   '#d97706',
-  visual:     '#2563eb',
-  elderly:    '#7c3aed',
   general:    '#1e9e75',
 };
 
@@ -86,8 +81,6 @@ const PFILTERS = {
   wheelchair: { 'filter-no-stairs': true,  'filter-no-cobble': true,  'filter-quiet': false, 'filter-no-crowds': false, 'filter-shade': false },
   autism:     { 'filter-no-stairs': false, 'filter-no-cobble': false, 'filter-quiet': true,  'filter-no-crowds': true,  'filter-shade': true  },
   stroller:   { 'filter-no-stairs': true,  'filter-no-cobble': true,  'filter-quiet': false, 'filter-no-crowds': false, 'filter-shade': false },
-  visual:     { 'filter-no-stairs': true,  'filter-no-cobble': false, 'filter-quiet': false, 'filter-no-crowds': false, 'filter-shade': false },
-  elderly:    { 'filter-no-stairs': true,  'filter-no-cobble': true,  'filter-quiet': false, 'filter-no-crowds': false, 'filter-shade': true  },
   general:    { 'filter-no-stairs': false, 'filter-no-cobble': false, 'filter-quiet': false, 'filter-no-crowds': false, 'filter-shade': false },
 };
 
