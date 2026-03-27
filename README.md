@@ -1,6 +1,6 @@
 # EqualPath Backend
 
-Python Flask backend с Gemini AI за достъпна навигация.
+Python Flask backend с Grok (xAI) за достъпна навигация.
 
 ---
 
@@ -14,12 +14,10 @@ Python Flask backend с Gemini AI за достъпна навигация.
 pip install -r requirements.txt
 ```
 
-### 2. Вземи безплатен Gemini API ключ
+### 2. Вземи безплатен Grok API ключ
 
-1. Отиди на → https://aistudio.google.com/app/apikey
-2. Влез с Google акаунт
-3. Натисни **"Create API key"**
-4. Копирай ключа
+1. Отиди на → https://docs.x.ai/developers/models
+2. Копирай ключа
 
 ### 3. Създай `.env` файл
 
@@ -146,6 +144,4 @@ app.py → JSON отговор към Frontend
 | `wheelchair` | Инвалидна количка — стълбите са абсолютно непреодолими |
 | `autism` | Аутизъм/Сензорно — приоритет тихи улици |
 | `stroller` | Детска количка — без стълби и павета |
-| `visual` | Зрителни затруднения — осветление е критично |
-| `elderly` | Бавна походка — пейки и без стръмни участъци |
 | `general` | Стандартен пешеходен маршрут |
