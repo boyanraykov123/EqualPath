@@ -93,7 +93,13 @@ gi('login-form').addEventListener('submit', async (e) => {
     toast(`👋 Добре дошъл, ${user.name}!`);
   } catch (err) {
     console.error('Login error:', err);
-    shwE('login-gen-err', err.message || '⚠️ Грешен имейл или парола.');
+    const raw = err.message || '';
+    const bgLogin =
+      raw.includes('Invalid login credentials') ? 'Грешен имейл или парола.' :
+      raw.includes('Email not confirmed')       ? 'Имейлът не е потвърден.' :
+      raw.includes('Too many requests')          ? 'Твърде много опити. Опитай по-късно.' :
+      '⚠️ Грешен имейл или парола.';
+    shwE('login-gen-err', bgLogin);
   }
 });
 
@@ -172,13 +178,14 @@ gi('btn-do-register').addEventListener('click', async () => {
 
     const userId = authData.user.id;
 
-    // 2. Профил в profiles таблицата
-    const { error: profErr } = await sb.from('profiles').insert({
-      user_id: userId,
-      full_name: name,
-      health_needs: needs,
+    // 2. Профил в profiles таблицата (през backend-а, за да се хешира паролата)
+    const profResp = await fetch(`${API_BASE}/api/profiles`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId, full_name: name, health_needs: needs, password: pw }),
     });
-    if (profErr) console.warn('Profile insert note:', profErr.message);
+    const profJson = await profResp.json();
+    if (!profJson.ok) console.warn('Profile insert note:', profJson.error);
 
     // 3. logIn локално
     const newUser = { id: userId, name, email, profile, needs, notes };
@@ -187,8 +194,16 @@ gi('btn-do-register').addEventListener('click', async () => {
     toast(`🎉 Профилът е създаден! Добре дошъл, ${name}!`);
   } catch (err) {
     console.error('Register error:', err);
-    const errEl = document.querySelector('.onboarding-step.active .form-error') || gi('reg-s1-err');
-    if (errEl) { errEl.textContent = err.message || 'Грешка при регистрация.'; errEl.classList.add('vis'); }
+    showStep(1);
+    const msg = err.message || '';
+    const bgMsg =
+      msg.includes('already registered')   ? 'Този имейл вече е регистриран.' :
+      msg.includes('invalid format')       ? 'Невалиден имейл формат.' :
+      msg.includes('at least')             ? 'Паролата е твърде кратка.' :
+      msg.includes('Too many requests')    ? 'Твърде много опити. Опитай по-късно.' :
+      msg.includes('Cannot set properties') ? 'Грешка при зареждане на профила.' :
+      'Грешка при регистрация.';
+    shwE('reg-s1-err', bgMsg);
   } finally {
     btn.disabled = false;
     btn.innerHTML = '✅ Готово!';
@@ -200,7 +215,6 @@ gi('btn-do-register').addEventListener('click', async () => {
 /* ── logIn / logOut ──────────────────────────────────────── */
 function logIn(user) {
   S.user = user;
-  clearMapRoute();
   const prof = user.profile ?? 'general';
   const r = document.querySelector(`input[name="user-profile"][value="${prof}"]`);
   if (r) { r.checked = true; r.dispatchEvent(new Event('change')); }
@@ -221,8 +235,17 @@ function logIn(user) {
   gi('pub-nm').textContent = user.name;
   gi('pub-pr').textContent = PLABELS[prof] || '';
 
+  // синхронизирай нуждите с sidebar филтрите
+  applyNeedsToFilters(user.needs);
+
   // load search history
   if (user.id) loadHistory(user.id);
+
+  // покажи "Запази маршрут" ако има активен маршрут
+  if (S.routePoly) gi('btn-save-route').style.display = 'block';
+
+  // презареди маркерите за да се покаже бутон "Премахни"
+  reloadObstacles();
 }
 
 gi('btn-logout').addEventListener('click', async () => {
@@ -234,5 +257,7 @@ gi('btn-logout').addEventListener('click', async () => {
   gi('profile-user-banner').classList.remove('vis');
   gi('user-menu').style.display = 'none';
   gi('history-list').innerHTML = '<div id="history-empty" style="font-size:.75rem;color:var(--ink-muted);padding:.25rem 0">Няма търсения.</div>';
+  // презареди маркерите за да се скрие бутон "Премахни"
+  reloadObstacles();
   toast('Излязохте от профила.');
 });

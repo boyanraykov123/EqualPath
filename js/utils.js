@@ -51,6 +51,23 @@ function toast(msg, dur = 3500) {
   }, dur);
 }
 
+/* ── Sync нужди ↔ sidebar филтри ─────────────────────────── */
+function applyNeedsToFilters(needs) {
+  Object.entries(NEEDS_FILTER).forEach(([need, filterId]) => {
+    const el = gi(filterId);
+    if (el) el.checked = (needs || []).includes(need);
+  });
+}
+
+function getFiltersAsNeeds() {
+  const needs = [];
+  Object.entries(NEEDS_FILTER).forEach(([need, filterId]) => {
+    const el = gi(filterId);
+    if (el && el.checked) needs.push(need);
+  });
+  return needs;
+}
+
 /* ── Debounce ────────────────────────────────────────────── */
 function debounce(fn, ms) {
   let t;

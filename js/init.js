@@ -3,8 +3,9 @@
    Инициализация: сесия, health check, restore, toggles, ESC
    ═══════════════════════════════════════════════════════════ */
 
-/* ── Автоматично възстановяване на Supabase сесия ─────────── */
+/* ── Автоматично възстановяване на сесия + маршрут ─────────── */
 (async () => {
+  // 1. Възстанови Supabase сесия
   const { data: { session } } = await sb.auth.getSession();
   if (session?.user) {
     const userId = session.user.id;
@@ -19,6 +20,31 @@
     };
     logIn(user);
   }
+
+  // 2. Възстанови маршрут от sessionStorage (след logIn, за да не се изтрие)
+  try {
+    const saved = sessionStorage.getItem('eq_route');
+    if (saved) {
+      const { data, from, to, fromName, toName } = JSON.parse(saved);
+      if (data && from && to) {
+        S.from = from;
+        S.to = to;
+        if (fromName) {
+          gi('input-from').value = fromName;
+          gi('input-from').classList.add('is-set');
+          gi('clear-from').classList.add('visible');
+        }
+        if (toName) {
+          gi('input-to').value = toName;
+          gi('input-to').classList.add('is-set');
+          gi('clear-to').classList.add('visible');
+        }
+        setA([from.lat, from.lng], fromName || 'Start');
+        setB([to.lat, to.lng], toName || 'End');
+        renderRoute(data);
+      }
+    }
+  } catch (e) { console.warn('Route restore failed:', e); }
 })();
 
 
@@ -27,28 +53,6 @@
 
 /* ── Зареждане на препятствия от DB ──────────────────────── */
 loadObstaclesFromDB();
-
-
-/* ── Възстановяване на маршрут от sessionStorage ─────────── */
-try {
-  const saved = sessionStorage.getItem('eq_route');
-  if (saved) {
-    const { data, from, to, fromName, toName } = JSON.parse(saved);
-    if (data && from && to) {
-      S.from = from;
-      S.to = to;
-      gi('input-from').value = fromName || '';
-      gi('input-from').classList.add('is-set');
-      gi('input-to').value = toName || '';
-      gi('input-to').classList.add('is-set');
-      gi('clear-from').classList.add('visible');
-      gi('clear-to').classList.add('visible');
-      setA([from.lat, from.lng], fromName || 'Start');
-      setB([to.lat, to.lng], toName || 'End');
-      renderRoute(data);
-    }
-  }
-} catch (e) { console.warn('Route restore failed:', e); }
 
 
 /* ── Global ESC ──────────────────────────────────────────── */

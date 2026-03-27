@@ -4,6 +4,11 @@
    ═══════════════════════════════════════════════════════════ */
 
 /* ── Зареждане на препятствия от DB ──────────────────────── */
+function reloadObstacles() {
+  obsL.clearLayers();
+  loadObstaclesFromDB();
+}
+
 async function loadObstaclesFromDB() {
   try {
     const resp = await fetch(`${API_BASE}/api/reports`, { signal: AbortSignal.timeout(5000) });
@@ -63,6 +68,7 @@ gi('obs-desc').addEventListener('input', () => { gi('char-count').textContent = 
 /* ── Изпращане на доклад ─────────────────────────────────── */
 gi('report-form').addEventListener('submit', async e => {
   e.preventDefault();
+  if (!S.user) { showAuthGate(); return; }
   clrE('obs-type-err');
   clrE('obs-gen-err');
   const type = gi('obs-type').value;
@@ -142,6 +148,7 @@ function addObsMark(report, meta) {
 
 /* ── Премахване на препятствие ────────────────────────────── */
 async function removeReport(reportId, btnEl) {
+  if (!S.user) { showAuthGate(); return; }
   if (btnEl) { btnEl.disabled = true; btnEl.textContent = '...'; }
   try {
     await fetch(`${API_BASE}/api/reports/${reportId}`, { method: 'DELETE', signal: AbortSignal.timeout(5000) });

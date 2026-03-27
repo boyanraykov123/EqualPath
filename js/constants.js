@@ -78,12 +78,24 @@ const PMETRICS = {
   ],
 };
 
+/* ── Mapping нужди ↔ sidebar филтри ─────────────────────────── */
+const NEEDS_FILTER = {
+  'no-stairs': 'filter-no-stairs',
+  'quiet':     'filter-quiet',
+  'smooth':    'filter-smooth',
+  'no-crowds': 'filter-no-crowds',
+  'shade':     'filter-shade',
+  'benches':   'filter-benches',
+  'toilets':   'filter-toilets',
+  'wide':      'filter-wide',
+};
+
 /* ── Автоматични филтри по профил ─────────────────────────── */
 const PFILTERS = {
-  wheelchair: { 'filter-no-stairs': true,  'filter-no-cobble': true,  'filter-quiet': false, 'filter-no-crowds': false, 'filter-shade': false },
-  autism:     { 'filter-no-stairs': false, 'filter-no-cobble': false, 'filter-quiet': true,  'filter-no-crowds': true,  'filter-shade': true  },
-  stroller:   { 'filter-no-stairs': true,  'filter-no-cobble': true,  'filter-quiet': false, 'filter-no-crowds': false, 'filter-shade': false },
-  general:    { 'filter-no-stairs': false, 'filter-no-cobble': false, 'filter-quiet': false, 'filter-no-crowds': false, 'filter-shade': false },
+  wheelchair: { 'filter-no-stairs': true,  'filter-smooth': true,  'filter-quiet': false, 'filter-no-crowds': false, 'filter-shade': false },
+  autism:     { 'filter-no-stairs': false, 'filter-smooth': false, 'filter-quiet': true,  'filter-no-crowds': true,  'filter-shade': true  },
+  stroller:   { 'filter-no-stairs': true,  'filter-smooth': true,  'filter-quiet': false, 'filter-no-crowds': false, 'filter-shade': false },
+  general:    { 'filter-no-stairs': false, 'filter-smooth': false, 'filter-quiet': false, 'filter-no-crowds': false, 'filter-shade': false },
 };
 
 /* ── Метаданни за препятствия ─────────────────────────────── */

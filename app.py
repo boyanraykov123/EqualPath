@@ -13,6 +13,8 @@ from datetime import datetime
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from dotenv import load_dotenv
+from werkzeug.security import generate_password_hash
+from supabase_auth.types import AdminUserAttributes
 
 # Fix Windows console encoding for Unicode/Cyrillic output
 if sys.stdout.encoding != 'utf-8':
@@ -358,13 +360,23 @@ def create_profile():
         "health_needs": body.get("health_needs", []),
     }
 
+    # Хешираме паролата, ако е подадена
+    raw_pw = body.get("password", "")
+    if raw_pw:
+        profile["password_hash"] = generate_password_hash(raw_pw)
+
     try:
         db = get_db()
-        result = db.table("profiles").upsert(profile, on_conflict="user_id").execute()
+        # Проверяваме дали профилът вече съществува
+        existing = db.table("profiles").select("user_id").eq("user_id", body["user_id"]).execute()
+        if existing.data:
+            result = db.table("profiles").update(profile).eq("user_id", body["user_id"]).execute()
+        else:
+            result = db.table("profiles").insert(profile).execute()
     except Exception as e:
         return jsonify({"ok": False, "error": f"Грешка: {e}"}), 500
 
-    return jsonify({"ok": True, "profile": result.data[0]})
+    return jsonify({"ok": True, "profile": result.data[0] if result.data else profile})
 
 
 @app.route("/api/profiles/<user_id>", methods=["GET"])
@@ -377,6 +389,116 @@ def get_profile(user_id):
         return jsonify({"ok": False, "error": f"Профилът не е намерен."}), 404
 
     return jsonify({"ok": True, "profile": result.data})
+
+
+@app.route("/api/profiles/update-auth", methods=["POST"])
+def update_auth():
+    """Обновява име/имейл/парола в Supabase Auth + profiles таблицата."""
+    try:
+        body = request.get_json(force=True)
+    except Exception:
+        return jsonify({"ok": False, "error": "Невалиден JSON."}), 400
+
+    user_id = body.get("user_id")
+    if not user_id:
+        return jsonify({"ok": False, "error": "Липсва user_id."}), 400
+
+    new_name = body.get("full_name", "").strip()
+    new_email = body.get("email", "").strip()
+    new_pw = body.get("password", "")
+
+    try:
+        db = get_db()
+
+        # 1. Обнови Supabase Auth (имейл, парола, име в user_metadata)
+        auth_attrs = {}
+        if new_email:
+            auth_attrs["email"] = new_email
+            auth_attrs["email_confirm"] = True
+        if new_pw:
+            auth_attrs["password"] = new_pw
+        if new_name:
+            auth_attrs["user_metadata"] = {"full_name": new_name}
+
+        if auth_attrs:
+            db.auth.admin.update_user_by_id(user_id, AdminUserAttributes(**auth_attrs))
+
+        # 2. Обнови profiles таблицата (име + парола хеш)
+        profile_update = {}
+        if new_name:
+            profile_update["full_name"] = new_name[:200]
+        if new_pw:
+            profile_update["password_hash"] = generate_password_hash(new_pw)
+
+        if profile_update:
+            db.table("profiles").update(profile_update).eq("user_id", user_id).execute()
+
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Грешка: {e}"}), 500
+
+    return jsonify({"ok": True})
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# /api/saved-routes  (запазени маршрути)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@app.route("/api/saved-routes", methods=["POST"])
+def save_route():
+    """Запазва маршрут за потребител."""
+    try:
+        body = request.get_json(force=True)
+    except Exception:
+        return jsonify({"ok": False, "error": "Невалиден JSON."}), 400
+
+    if not body.get("user_id"):
+        return jsonify({"ok": False, "error": "Липсва user_id."}), 400
+
+    record = {
+        "user_id":        body["user_id"],
+        "start_location": str(body.get("start_location", ""))[:500],
+        "end_location":   str(body.get("end_location", ""))[:500],
+        "start_coords":   body.get("start_coords", {}),
+        "end_coords":     body.get("end_coords", {}),
+        "distance_km":    body.get("distance_km", 0),
+        "duration_min":   body.get("duration_min", 0),
+        "comfort_index":  body.get("comfort_index", 0),
+        "geojson":        body.get("geojson", {}),
+        "ai_analysis":    str(body.get("ai_analysis", ""))[:2000],
+        "profile":        body.get("profile", "general"),
+    }
+
+    try:
+        db = get_db()
+        result = db.table("saved_routes").insert(record).execute()
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Грешка: {e}"}), 500
+
+    return jsonify({"ok": True, "id": result.data[0]["id"] if result.data else None})
+
+
+@app.route("/api/saved-routes/user/<user_id>", methods=["GET"])
+def get_saved_routes(user_id):
+    """Връща запазените маршрути за потребител."""
+    try:
+        db = get_db()
+        result = db.table("saved_routes").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Грешка: {e}"}), 500
+
+    return jsonify({"ok": True, "routes": result.data, "count": len(result.data)})
+
+
+@app.route("/api/saved-routes/<route_id>", methods=["DELETE"])
+def delete_saved_route(route_id):
+    """Изтрива запазен маршрут."""
+    try:
+        db = get_db()
+        db.table("saved_routes").delete().eq("id", route_id).execute()
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Грешка: {e}"}), 500
+
+    return jsonify({"ok": True})
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

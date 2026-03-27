@@ -72,6 +72,7 @@ function showRI() { gi('route-info').classList.add('visible'); }
 
 function hideRI() {
   gi('route-info').classList.remove('visible');
+  gi('btn-save-route').style.display = 'none';
 }
 
 
@@ -110,6 +111,7 @@ function renderRoute(data) {
   // Профил-специфични метрики (скрити — изчистен UI)
 
   showRI();
+  gi('btn-save-route').style.display = S.user ? 'block' : 'none';
   map.fitBounds(S.routePoly.getBounds(), { padding: [50, 50] });
 
   // Запазваме маршрута за възстановяване при refresh
@@ -176,6 +178,8 @@ function clearMapRoute() {
   gi('input-to').value = '';
   gi('input-from').classList.remove('is-set');
   gi('input-to').classList.remove('is-set');
+  gi('clear-from').classList.remove('visible');
+  gi('clear-to').classList.remove('visible');
   
   // Премахване на маркери
   if (typeof mA !== 'undefined' && mA) {
@@ -200,6 +204,13 @@ document.querySelectorAll('input[name="user-profile"]').forEach(r => {
     const p = r.value;
     const d = PFILTERS[p] ?? PFILTERS.general;
     Object.entries(d).forEach(([id, v]) => { const el = gi(id); if (el) el.checked = v; });
+    // Нуждите на потребителя остават винаги отбелязани (добавяме отгоре)
+    if (S.user?.needs) {
+      S.user.needs.forEach(need => {
+        const fid = NEEDS_FILTER[need];
+        if (fid) { const el = gi(fid); if (el) el.checked = true; }
+      });
+    }
 
     // 1. Моментална смяна на цвета на всички слоеве (главен + алтернативи)
     const newColor = PCOLORS[p] || '#1e9e75';
