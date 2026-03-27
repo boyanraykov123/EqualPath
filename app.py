@@ -42,10 +42,10 @@ CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 @app.route("/api/health", methods=["GET"])
 def health():
-    """Проверка дали сървърът и Grok са конфигурирани."""
+    """Проверка дали сървърът и Gemini са конфигурирани."""
     ai_ok = bool(
-        os.getenv("XAI_API_KEY") and
-        os.getenv("XAI_API_KEY") != "your_xai_api_key_here"
+        os.getenv("GEMINI_API_KEY") and
+        os.getenv("GEMINI_API_KEY") != "your_gemini_api_key_here"
     )
     # Проверяваме Supabase връзката
     try:
@@ -150,9 +150,9 @@ def route():
         print(f"[route] OSRM/OSM грешка: {e}")
         return jsonify({"ok": False, "error": str(e)}), 502
 
-    # ── Стъпка 2: AI scoring с Grok ────────────────────────────────────────
+    # ── Стъпка 2: AI scoring с Gemini ──────────────────────────────────────
     try:
-        print("[route] Стъпка 2: AI scoring с Grok...")
+        print("[route] Стъпка 2: AI scoring с Gemini...")
         result = score_routes_with_ai(candidates, profile, needs, notes)
         print(f"[route] AI избра маршрут {result['chosen_route_index']} | CI={result['comfort_index']}")
     except Exception as e:

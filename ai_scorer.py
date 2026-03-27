@@ -1,31 +1,32 @@
 """
 ai_scorer.py — EqualPath
-Grok AI scorer: взима анализирани маршрути + потребителски профил
+Gemini AI scorer: взима анализирани маршрути + потребителски профил
 и избира най-удобния маршрут с обяснение.
 """
 
 import os
 import json
-from openai import OpenAI
+import google.generativeai as genai
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# ── Grok (xAI) setup ────────────────────────────────────────────────────────
-_client = None
+# ── Gemini setup ─────────────────────────────────────────────────────────────
+_model = None
 
 def _ensure_configured():
-    global _client
-    if _client is not None:
+    global _model
+    if _model is not None:
         return
-    api_key = os.getenv("XAI_API_KEY", "")
-    if not api_key or api_key == "your_xai_api_key_here":
+    api_key = os.getenv("GEMINI_API_KEY", "")
+    if not api_key or api_key == "your_gemini_api_key_here":
         raise Exception(
-            "XAI_API_KEY не е зададен. "
+            "GEMINI_API_KEY не е зададен. "
             "Копирай .env.example → .env и добави ключа от "
-            "https://console.x.ai"
+            "https://aistudio.google.com/app/apikey"
         )
-    _client = OpenAI(api_key=api_key, base_url="https://api.x.ai/v1")
+    genai.configure(api_key=api_key)
+    _model = genai.GenerativeModel("gemini-2.0-flash")
 
 
 # ── Profile definitions ───────────────────────────────────────────────────────
@@ -83,7 +84,7 @@ NEED_DESCRIPTIONS = {
 # ── Prompt builder ────────────────────────────────────────────────────────────
 
 def build_prompt(routes, profile, needs, notes=""):
-    """Изгражда структуриран prompt за Grok."""
+    """Изгражда структуриран prompt за Gemini."""
 
     profile_desc = PROFILE_DESCRIPTIONS.get(profile, PROFILE_DESCRIPTIONS["general"])
     needs_list   = "\n".join(f"  - {NEED_DESCRIPTIONS.get(n, n)}" for n in needs) if needs else "  (няма специфични)"
@@ -156,11 +157,11 @@ OSM характеристики:
     return prompt
 
 
-# ── Grok call ────────────────────────────────────────────────────────────────
+# ── Gemini call ───────────────────────────────────────────────────────────────
 
 def score_routes_with_ai(routes, profile, needs, notes=""):
     """
-    Главна функция: изпраща маршрутите към Grok и връща решението.
+    Главна функция: изпраща маршрутите към Gemini и връща решението.
 
     Връща речник:
     {
@@ -192,15 +193,16 @@ def score_routes_with_ai(routes, profile, needs, notes=""):
 
     try:
         _ensure_configured()
-        response = _client.chat.completions.create(
-            model="grok-3-mini",
-            max_tokens=4096,
-            temperature=0.4,
-            messages=[{"role": "user", "content": prompt}],
+        response = _model.generate_content(
+            prompt,
+            generation_config=genai.types.GenerationConfig(
+                max_output_tokens=4096,
+                temperature=0.4,
+            ),
         )
-        raw_text = response.choices[0].message.content.strip()
+        raw_text = response.text.strip()
     except Exception as e:
-        print(f"[ai_scorer] Grok error: {e}")
+        print(f"[ai_scorer] Gemini error: {e}")
         # Fallback: избираме маршрута с най-добър score без AI
         fallback = _fallback_score(routes, profile, needs)
         return _ensure_obstacle_avoidance(fallback, routes, profile, needs)
@@ -307,7 +309,7 @@ def _ensure_obstacle_avoidance(result, routes, profile, needs):
 
 
 def _fallback_score(routes, profile, needs):
-    """Fallback при Grok грешка: избира най-добрия маршрут по тежести."""
+    """Fallback при Gemini грешка: избира най-добрия маршрут по тежести."""
     # За 'general' профил — просто най-бързият маршрут
     if profile == "general":
         best_route = min(routes, key=lambda r: r.get("duration_s", r.get("duration_min", 999) * 60))
