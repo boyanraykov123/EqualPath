@@ -4,12 +4,13 @@ db.py — EqualPath Supabase connection
 """
 
 import os
+from typing import Optional
 from supabase import create_client, Client
 from dotenv import load_dotenv
 
 load_dotenv()
 
-_client: Client | None = None
+_client: Optional[Client] = None
 
 
 def get_db() -> Client:
