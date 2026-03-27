@@ -20,10 +20,13 @@
     </svg>
   </button>
   <a href="#" class="logo-wordmark">Equal<span>Path</span></a>
-  <div class="comfort-badge"><span style="font-size:.85rem">🧭</span> Comfort Index</div>
-  <div id="backend-badge" title="Статус на AI сървъра" style="display:flex;align-items:center;gap:.35rem;padding:.3rem .75rem;border-radius:100px;font-size:.72rem;font-weight:600;border:1.5px solid var(--border);color:var(--ink-muted);cursor:default;transition:all .3s">
-    <span id="bb-dot" style="width:7px;height:7px;border-radius:50%;background:var(--ink-faint);flex-shrink:0"></span>
-    <span id="bb-text">AI офлайн</span>
+  <div class="comfort-badge" tabindex="0" aria-describedby="ci-tooltip">
+    <span style="font-size:.85rem">🧭</span>
+    <span>Comfort Index</span>
+    <div class="ci-tooltip" id="ci-tooltip" role="tooltip">
+      <strong>Comfort Index</strong>
+      <div class="ci-body">AI оценка 1–10 за удобството на маршрута. Комбинираме OSM анализ и модели за препоръки.</div>
+    </div>
   </div>
   <button id="user-chip" style="display:none">
     <span id="uc-icon">🚶</span>
@@ -111,10 +114,6 @@
           <div class="comfort-dot" data-i="10"></div>
         </div>
         <span class="comfort-label" id="comfort-label-text">–/10</span>
-      </div>
-      <div id="profile-metrics" style="display:none;background:var(--white);border:1px solid var(--brand-border);border-radius:10px;padding:.65rem .875rem;font-size:.8rem;line-height:1.5">
-        <span id="profile-metrics-title" style="font-size:.65rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--brand);display:block;margin-bottom:.4rem"></span>
-        <div id="profile-metrics-chips" style="display:flex;flex-wrap:wrap;gap:.35rem"></div>
       </div>
       <button id="btn-clear-route">✕ Изчисти маршрута</button>
     </div>

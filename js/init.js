@@ -22,28 +22,7 @@
 })();
 
 
-/* ── Backend health check ────────────────────────────────── */
-async function checkBackend() {
-  try {
-    const r = await fetch(`${API_BASE}/api/health`, { signal: AbortSignal.timeout(3000) });
-    if (!r.ok) throw new Error();
-    const d = await r.json();
-    const aiOk = d.ai === 'configured';
-    gi('bb-dot').style.background          = aiOk ? '#22c55e' : '#f59e0b';
-    gi('bb-text').textContent              = aiOk ? 'AI онлайн' : 'AI – няма ключ';
-    gi('backend-badge').style.borderColor  = aiOk ? '#86efac' : '#fde68a';
-    gi('backend-badge').style.color        = aiOk ? '#15803d' : '#92400e';
-    return true;
-  } catch {
-    gi('bb-dot').style.background         = '#ef4444';
-    gi('bb-text').textContent             = 'AI офлайн';
-    gi('backend-badge').style.borderColor = '#fca5a5';
-    gi('backend-badge').style.color       = '#991b1b';
-    return false;
-  }
-}
-checkBackend();
-setInterval(checkBackend, 15000);
+/* Backend health check removed: AI status element hidden — no DOM updates performed */
 
 
 /* ── Зареждане на препятствия от DB ──────────────────────── */
