@@ -622,10 +622,12 @@ def _analyze_one_route(route, obstacles):
             "scores": {k: 0.5 for k in ["stairs","cobble","kerbs","steep","lighting","footways","benches","toilets","noise","complexity","green","crossings","smooth","tactile"]},
         }
 
-    # Запазваме coords/distance/duration от оригиналния маршрут
+    # Запазваме coords/distance/duration/source от оригиналния маршрут
     result["coords"]   = route["coords"]
     result["distance"] = route["distance"]
     result["duration"] = route["duration"]
+    if "source" in route:
+        result["source"] = route["source"]
 
     obs_count, obs_nearby = count_obstacles_near_route(obstacles, route["coords"])
     result["osm"]["reported_obstacles"] = obs_count
@@ -667,7 +669,7 @@ def _query_profile_waypoints(from_lat, from_lon, to_lat, to_lon, profile):
     if profile not in _PROFILE_OVERPASS:
         return []
 
-    padding = 0.005
+    padding = 0.01
     bbox = {
         "south": min(from_lat, to_lat) - padding,
         "north": max(from_lat, to_lat) + padding,
@@ -738,8 +740,8 @@ def _generate_profile_routes(from_lat, from_lon, to_lat, to_lon, profile, next_i
     routes = []
     seen_distances = set()
 
-    for wlat, wlon in centers[:6]:
-        if len(routes) >= 4:
+    for wlat, wlon in centers[:10]:
+        if len(routes) >= 6:
             break
         if haversine(wlat, wlon, from_lat, from_lon) < 80:
             continue
@@ -754,11 +756,107 @@ def _generate_profile_routes(from_lat, from_lon, to_lat, to_lon, profile, next_i
         seen_distances.add(dist_key)
         idx = next_index + len(routes)
         r["index"] = idx
+        r["source"] = f"profile-{profile}"
         routes.append(r)
         print(f"[profile-routing] Маршрут {idx} (overpass-{profile}): {round(r['distance']/1000,2)}км")
 
     print(f"[profile-routing] Общо {len(routes)} допълнителни маршрута за '{profile}'")
     return routes
+
+
+# ── Profile hard constraints ──────────────────────────────────────────────────
+
+# Дефинира кои OSM метрики са КРИТИЧНИ за всеки профил.
+# "max" = максимален допустим брой (над него маршрутът е дисквалифициран).
+# "score_floor" = ако score-а падне под тази стойност, маршрутът се наказва тежко.
+_PROFILE_HARD_CONSTRAINTS = {
+    "wheelchair": {
+        # Стълбите са абсолютно непреодолими
+        "stairs_segments":  {"max": 0, "penalty_per": 0.5},
+        # Павета и лоши бордюри са много проблематични
+        "cobble_segments":  {"max": 1, "penalty_per": 0.15},
+        "bad_kerbs":        {"max": 1, "penalty_per": 0.15},
+        "steep_segments":   {"max": 0, "penalty_per": 0.2},
+    },
+    "autism": {
+        # Шумните улици и тълпите са критични
+        "busy_roads_nearby": {"max": 2, "penalty_per": 0.15},
+        # Сложните маршрути са проблематични
+        "significant_turns": {"max": 8, "penalty_per": 0.05},
+    },
+    "stroller": {
+        # Стълбите са непреодолими
+        "stairs_segments":  {"max": 0, "penalty_per": 0.5},
+        # Павета са много неудобни
+        "cobble_segments":  {"max": 1, "penalty_per": 0.15},
+        "bad_kerbs":        {"max": 1, "penalty_per": 0.12},
+    },
+    "visual": {
+        # Неосветени участъци са опасни
+        "unlit_segments":   {"max": 1, "penalty_per": 0.2},
+        "bad_kerbs":        {"max": 2, "penalty_per": 0.1},
+    },
+    "elderly": {
+        "steep_segments":   {"max": 1, "penalty_per": 0.15},
+        "stairs_segments":  {"max": 1, "penalty_per": 0.2},
+    },
+}
+
+# Бонуси: кои score-ове трябва да са ВИСОКИ за всеки профил
+_PROFILE_BONUSES = {
+    "wheelchair": {"smooth": 0.15, "footways": 0.05},
+    "autism":     {"green": 0.2, "noise": 0.15, "complexity": 0.1},
+    "stroller":   {"smooth": 0.15, "footways": 0.05},
+    "visual":     {"tactile": 0.2, "lighting": 0.15, "crossings": 0.1},
+    "elderly":    {"benches": 0.1, "green": 0.1},
+}
+
+
+def _apply_profile_penalties(analyzed, profile, needs):
+    """
+    Прилага профил-специфични наказания и бонуси към score-овете на маршрутите.
+    Това позволява на AI scorer-а (и fallback-а) да избере правилния маршрут.
+    """
+    constraints = _PROFILE_HARD_CONSTRAINTS.get(profile, {})
+    bonuses = _PROFILE_BONUSES.get(profile, {})
+
+    if not constraints and not bonuses:
+        return analyzed
+
+    for route in analyzed:
+        osm = route.get("osm", {})
+        scores = route.get("scores", {})
+        penalty = 0.0
+
+        # Hard constraints: наказваме маршрути, които нарушават критични изисквания
+        for metric, rule in constraints.items():
+            count = osm.get(metric, 0)
+            limit = rule["max"]
+            if count > limit:
+                excess = count - limit
+                penalty += excess * rule["penalty_per"]
+
+        # Бонуси: повишаваме scores за маршрути с добри характеристики
+        bonus = 0.0
+        for score_key, weight in bonuses.items():
+            val = scores.get(score_key, 0.0)
+            bonus += val * weight
+
+        # Прилагаме penalty като намаление на всички scores пропорционално
+        if penalty > 0:
+            factor = max(0.05, 1.0 - penalty)
+            for key in scores:
+                scores[key] = round(scores[key] * factor, 3)
+            route["profile_penalty"] = round(penalty, 2)
+            print(f"[profile] Маршрут {route['index']}: penalty={penalty:.2f} (factor={factor:.2f}) за профил '{profile}'")
+
+        # Прилагаме бонуси
+        if bonus > 0:
+            for key in scores:
+                scores[key] = round(min(1.0, scores[key] + bonus * 0.3), 3)
+            print(f"[profile] Маршрут {route['index']}: bonus={bonus:.2f} за профил '{profile}'")
+
+    return analyzed
 
 
 # ── Main entrypoint ───────────────────────────────────────────────────────────
@@ -813,11 +911,16 @@ def get_candidate_routes(from_lat, from_lon, to_lat, to_lon, profile="general", 
                 status = "✓ ЧИСТ" if route_obs == 0 else f"⚠ {route_obs} препятствия"
                 print(f"[avoidance] Маршрут {result['index']}: {result['distance_km']}км — {status}")
 
+    # ── Профил-специфични наказания (hard constraints) ──────────────────────
+    analyzed = _apply_profile_penalties(analyzed, profile, needs)
+
     # Логваме финалното разпределение
     print(f"\n[routing] ══ {len(analyzed)} кандидат-маршрута ══")
     for r in analyzed:
         obs = r["osm"].get("reported_obstacles", 0)
+        pen = r.get("profile_penalty", 0)
         marker = "✓" if obs == 0 else "✗"
-        print(f"[routing] {marker} Маршрут {r['index']}: {r['distance_km']}км, {obs} препятстви{'е' if obs == 1 else 'я'}, obstacle_score={r['scores'].get('obstacles', '?')}")
+        pen_str = f", penalty={pen}" if pen > 0 else ""
+        print(f"[routing] {marker} Маршрут {r['index']}: {r['distance_km']}км, {obs} препятстви{'е' if obs == 1 else 'я'}, obstacle_score={r['scores'].get('obstacles', '?')}{pen_str}")
 
     return analyzed

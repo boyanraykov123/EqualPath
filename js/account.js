@@ -241,9 +241,32 @@ async function loadSavedRoutes() {
       });
 
       // Зареди на картата
-      item.querySelector(`[data-sr-load="${rt.id}"]`).addEventListener('click', () => {
-        loadSavedRouteOnMap(rt);
-        closeAccount();
+      item.querySelector(`[data-sr-load="${rt.id}"]`).addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        try {
+          const from = typeof rt.start_coords === 'string' ? JSON.parse(rt.start_coords) : rt.start_coords;
+          const to = typeof rt.end_coords === 'string' ? JSON.parse(rt.end_coords) : rt.end_coords;
+          const geojson = typeof rt.geojson === 'string' ? JSON.parse(rt.geojson) : rt.geojson;
+          const data = {
+            geojson,
+            distance_km: rt.distance_km,
+            duration_min: rt.duration_min,
+            comfort_index: rt.comfort_index,
+            reason: rt.ai_analysis,
+            profile: rt.profile || 'general',
+            alternatives: [],
+          };
+          sessionStorage.setItem('eq_route', JSON.stringify({
+            data, from: from || null, to: to || null,
+            fromName: rt.start_location || '',
+            toName: rt.end_location || '',
+          }));
+          window.location.reload();
+        } catch (err) {
+          console.error('[EqualPath] Load saved route error:', err);
+          toast('Грешка при зареждане на маршрута.');
+        }
       });
 
       // Изтрий
@@ -280,16 +303,18 @@ function loadSavedRouteOnMap(rt) {
     alternatives: [],
   };
 
-  // Постави координатите
+  // Постави координатите и маркерите
   if (rt.start_coords) {
     S.from = { lat: rt.start_coords.lat, lng: rt.start_coords.lng, label: rt.start_location };
     gi('input-from').value = rt.start_location;
     gi('input-from').classList.add('is-set');
+    setA([rt.start_coords.lat, rt.start_coords.lng], rt.start_location);
   }
   if (rt.end_coords) {
     S.to = { lat: rt.end_coords.lat, lng: rt.end_coords.lng, label: rt.end_location };
     gi('input-to').value = rt.end_location;
     gi('input-to').classList.add('is-set');
+    setB([rt.end_coords.lat, rt.end_coords.lng], rt.end_location);
   }
 
   renderRoute(data);

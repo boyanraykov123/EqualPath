@@ -152,7 +152,6 @@ gi('btn-find-route').addEventListener('click', async () => {
     renderRoute(data);
     const obsNote = data.obstacles_on_route > 0 ? ` · ⚠️ ${data.obstacles_on_route} препятстви(я)` : '';
     toast(`✅ ${data.route_summary} · CI ${data.comfort_index}/10${obsNote}`);
-    if (S.user?.id) loadHistory(S.user.id);
   } catch (err) {
     clearInterval(stepTimer);
     console.error('[EqualPath]', err);
