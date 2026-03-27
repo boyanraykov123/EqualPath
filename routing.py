@@ -509,19 +509,19 @@ def get_avoidance_routes(from_lat, from_lon, to_lat, to_lon, nearby_obstacles, o
 
         print(f"[avoidance] Препятствие на {min_dist:.0f}м от маршрут точка {nearest_idx}/{len(ref_coords)}")
 
-        # 2. Намираме точки ~200м ПРЕДИ и СЛЕД препятствието по маршрута
+        # 2. Намираме точки ~350м ПРЕДИ и СЛЕД препятствието по маршрута
         before_idx = nearest_idx
         while before_idx > 1:
             before_idx -= 1
             d = haversine(ref_coords[before_idx][1], ref_coords[before_idx][0], obs_lat, obs_lon)
-            if d >= 200:
+            if d >= 350:
                 break
 
         after_idx = nearest_idx
         while after_idx < len(ref_coords) - 2:
             after_idx += 1
             d = haversine(ref_coords[after_idx][1], ref_coords[after_idx][0], obs_lat, obs_lon)
-            if d >= 200:
+            if d >= 350:
                 break
 
         before_pt = ref_coords[before_idx]  # [lon, lat]
@@ -542,21 +542,31 @@ def get_avoidance_routes(from_lat, from_lon, to_lat, to_lon, nearby_obstacles, o
         perp_dy = dx / seg_len   # отместване по lat
 
         # 4. Генерираме detour маршрути с различни отмествания
-        for offset_deg in [0.0015, 0.003, 0.005]:  # ~150м, ~300м, ~500м
+        for offset_deg in [0.003, 0.005, 0.008]:  # ~300м, ~500м, ~800м
             for direction in [1, -1]:  # ляво/дясно
                 detour_lat = obs_lat + direction * perp_dy * offset_deg
                 detour_lon = obs_lon + direction * perp_dx * offset_deg
+
+                # Междинни точки между before/after и detour (също отместени)
+                # Това не позволява на OSRM да се върне през препятствието
+                half_offset = offset_deg * 0.5
+                mid_before_lat = (before_pt[1] + detour_lat) / 2 + direction * perp_dy * half_offset
+                mid_before_lon = (before_pt[0] + detour_lon) / 2 + direction * perp_dx * half_offset
+                mid_after_lat  = (after_pt[1] + detour_lat) / 2 + direction * perp_dy * half_offset
+                mid_after_lon  = (after_pt[0] + detour_lon) / 2 + direction * perp_dx * half_offset
 
                 wp_key = (round(detour_lat, 4), round(detour_lon, 4))
                 if wp_key in seen_keys:
                     continue
                 seen_keys.add(wp_key)
 
-                # 3-точков detour: before → offset → after
+                # 5-точков detour: before → mid_before → offset → mid_after → after
                 waypoints = (
                     f"{from_lon},{from_lat};"
                     f"{before_pt[0]},{before_pt[1]};"
+                    f"{mid_before_lon},{mid_before_lat};"
                     f"{detour_lon},{detour_lat};"
+                    f"{mid_after_lon},{mid_after_lat};"
                     f"{after_pt[0]},{after_pt[1]};"
                     f"{to_lon},{to_lat}"
                 )
@@ -611,6 +621,11 @@ def _analyze_one_route(route, obstacles):
             "osm":    {k: 0 for k in ["stairs_segments","cobble_segments","bad_kerbs","steep_segments","unlit_segments","footway_segments","benches_nearby","accessible_toilets_nearby","busy_roads_nearby","parks_nearby","tactile_paving","safe_crossings","smooth_surface","significant_turns"]},
             "scores": {k: 0.5 for k in ["stairs","cobble","kerbs","steep","lighting","footways","benches","toilets","noise","complexity","green","crossings","smooth","tactile"]},
         }
+
+    # Запазваме coords/distance/duration от оригиналния маршрут
+    result["coords"]   = route["coords"]
+    result["distance"] = route["distance"]
+    result["duration"] = route["duration"]
 
     obs_count, obs_nearby = count_obstacles_near_route(obstacles, route["coords"])
     result["osm"]["reported_obstacles"] = obs_count

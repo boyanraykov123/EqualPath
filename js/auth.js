@@ -162,32 +162,17 @@ gi('btn-do-register').addEventListener('click', async () => {
       options: { data: { full_name: name, profile, health_needs: needs } }
     });
     if (authErr) throw authErr;
-    if (!authData.user) throw new Error('Регистрацията не върна потребител.');
 
-    // Ако има session, значи е потвърден автоматично; иначе опитай да влезеш
-    if (authData.session) {
-      // Потребителят е logged in
-    } else {
-      // Опитай да влезеш ръчно (ако email confirmation е изключен)
-      const { data: signInData, error: signInErr } = await sb.auth.signInWithPassword({ email, password: pw });
-      if (signInErr) {
-        // Ако не може да влезе, покажи съобщение
-        throw new Error('Регистрацията е успешна, но трябва да потвърдите имейла си преди да влезете.');
-      }
-    }
+    const userId = authData.user?.id || '';
 
-    const userId = authData.user.id;
-
-    // 2. Профил в profiles таблицата (през backend-а, за да се хешира паролата)
-    const profResp = await fetch(`${API_BASE}/api/profiles`, {
+    // Профил в profiles таблицата (fire-and-forget)
+    fetch(`${API_BASE}/api/profiles`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user_id: userId, full_name: name, health_needs: needs, password: pw }),
-    });
-    const profJson = await profResp.json();
-    if (!profJson.ok) console.warn('Profile insert note:', profJson.error);
+    }).catch(() => {});
 
-    // 3. logIn локално
+    // logIn локално и затвори
     const newUser = { id: userId, name, email, profile, needs, notes };
     logIn(newUser);
     closeAuth();
@@ -233,7 +218,7 @@ function logIn(user) {
   b.classList.add('vis');
   gi('pub-av').textContent = PICONS[prof] || '🚶';
   gi('pub-nm').textContent = user.name;
-  gi('pub-pr').textContent = PLABELS[prof] || '';
+  const pr = gi('pub-pr'); if (pr) pr.textContent = PLABELS[prof] || '';
 
   // синхронизирай нуждите с sidebar филтрите
   applyNeedsToFilters(user.needs);

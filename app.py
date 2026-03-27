@@ -22,7 +22,7 @@ if sys.stdout.encoding != 'utf-8':
 if sys.stderr.encoding != 'utf-8':
     sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 
-from routing import get_candidate_routes
+from routing import get_candidate_routes, count_obstacles_near_route, fetch_active_obstacles, get_avoidance_routes, haversine, _analyze_one_route
 from ai_scorer import score_routes_with_ai
 from db import get_db
 
@@ -159,8 +159,40 @@ def route():
         print(f"[route] AI грешка: {e}")
         return jsonify({"ok": False, "error": f"AI scoring грешка: {e}"}), 502
 
-    # ── Стъпка 3: Подготви отговора ───────────────────────────────────────────
+    # ── Стъпка 2.5: Ако избраният маршрут все още има препятствия, опитай последен re-route ──
     chosen = result["chosen_route"]
+    chosen_obs = chosen.get("osm", {}).get("reported_obstacles", 0)
+    if chosen_obs > 0:
+        print(f"[route] ⚠ Избраният маршрут има {chosen_obs} препятстви(я) — опитвам последен re-route...")
+        try:
+            obstacles = fetch_active_obstacles()
+            obs_near = []
+            for obs in obstacles:
+                for c in chosen["coords"]:
+                    if haversine(obs["latitude"], obs["longitude"], c[1], c[0]) <= 80:
+                        obs_near.append(obs)
+                        break
+            if obs_near:
+                reroutes = get_avoidance_routes(
+                    from_lat, from_lon, to_lat, to_lon,
+                    obs_near, [chosen], next_index=len(candidates)
+                )
+                for rr in reroutes:
+                    rr_obs, _ = count_obstacles_near_route(obstacles, rr["coords"])
+                    if rr_obs == 0:
+                        clean = _analyze_one_route(rr, obstacles)
+                        result["chosen_route"] = clean
+                        result["chosen_route_index"] = clean["index"]
+                        result["warning"] = "Маршрутът е пренасочен за да заобиколи препятствия."
+                        chosen = clean
+                        print(f"[route] ✓ Намерен чист re-route маршрут {clean['index']}: {clean['distance_km']}км")
+                        break
+                else:
+                    print("[route] Не е намерен чист re-route маршрут")
+        except Exception as e:
+            print(f"[route] Re-route грешка (non-fatal): {e}")
+
+    # ── Стъпка 3: Подготви отговора ───────────────────────────────────────────
 
     # Алтернативите — с geojson за показване на картата
     alternatives = []
@@ -188,6 +220,7 @@ def route():
         "scores":        chosen.get("scores", {}),
         "profile":       profile,
         "alternatives":  alternatives,
+        "obstacles_on_route": chosen.get("osm", {}).get("reported_obstacles", 0),
     }
 
     # ── Запис в Supabase (routes таблица) ───────────────────────────────────

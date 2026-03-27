@@ -85,6 +85,7 @@ gi('report-form').addEventListener('submit', async e => {
   let reportId = null;
 
   // Изпращаме към backend → Supabase
+  let saveFailed = false;
   try {
     const resp = await fetch(`${API_BASE}/api/reports`, {
       method: 'POST',
@@ -97,9 +98,15 @@ gi('report-form').addEventListener('submit', async e => {
       signal: AbortSignal.timeout(5000),
     });
     const json = await resp.json();
-    if (json.ok) reportId = json.id;
-  } catch {
-    console.warn('[EqualPath] Backend офлайн, докладът е само локален.');
+    if (json.ok) {
+      reportId = json.id;
+    } else {
+      console.error('[EqualPath] Obstacle save error:', json.error);
+      saveFailed = true;
+    }
+  } catch (err) {
+    console.error('[EqualPath] Obstacle save failed:', err);
+    saveFailed = true;
   }
 
   const report = {
@@ -108,7 +115,11 @@ gi('report-form').addEventListener('submit', async e => {
   };
   addObsMark(report, meta);
   closeObs();
-  toast(`${meta.emoji} Докладът е изпратен. Благодаря!`);
+  if (saveFailed) {
+    toast(`⚠️ Препятствието е показано, но НЕ е запазено в базата. Маршрутите няма да го заобикалят.`);
+  } else {
+    toast(`${meta.emoji} Докладът е изпратен. Благодаря!`);
+  }
   btn.disabled = false;
   btn.innerHTML = '✅ Изпрати';
 
