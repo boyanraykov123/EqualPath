@@ -72,7 +72,6 @@ function showRI() { gi('route-info').classList.add('visible'); }
 
 function hideRI() {
   gi('route-info').classList.remove('visible');
-  gi('profile-metrics').style.display = 'none';
 }
 
 
@@ -108,8 +107,7 @@ function renderRoute(data) {
   gi('route-comfort-score').textContent = data.comfort_index;
   updateDots(data.comfort_index);
 
-  // Профил-специфични метрики
-  renderProfileMetrics(profile, data.osm_data || {});
+  // Профил-специфични метрики (скрити — изчистен UI)
 
   showRI();
   map.fitBounds(S.routePoly.getBounds(), { padding: [50, 50] });
@@ -127,39 +125,7 @@ function renderRoute(data) {
 }
 
 
-/* ── Профил-специфични метрики (чипове) ──────────────────── */
-function renderProfileMetrics(profile, osm) {
-  const container = gi('profile-metrics');
-  const title     = gi('profile-metrics-title');
-  const chips     = gi('profile-metrics-chips');
-  const metrics   = PMETRICS[profile];
-
-  if (!metrics || !osm) {
-    container.style.display = 'none';
-    return;
-  }
-
-  const label = PLABELS[profile] || profile;
-  title.textContent = `${label} — ключови показатели`;
-  chips.innerHTML = '';
-
-  for (const m of metrics) {
-    const val = osm[m.key] ?? 0;
-    const isBad = m.bad(val);
-    const chip = document.createElement('span');
-    chip.style.cssText = `
-      display:inline-flex;align-items:center;gap:.25rem;
-      padding:.25rem .55rem;border-radius:6px;font-size:.75rem;font-weight:600;
-      background:${isBad ? '#fef2f2' : '#f0fdf4'};
-      color:${isBad ? '#991b1b' : '#166534'};
-      border:1px solid ${isBad ? '#fecaca' : '#bbf7d0'};
-    `;
-    chip.textContent = `${m.icon} ${m.label}: ${val}`;
-    chips.appendChild(chip);
-  }
-
-  container.style.display = 'block';
-}
+/* Profile metrics removed from UI — function intentionally omitted to simplify sidebar */
 
 
 /* ── Бутон „Намери маршрут" ──────────────────────────────── */

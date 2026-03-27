@@ -172,8 +172,6 @@ def score_routes_with_ai(routes, profile, needs, notes=""):
         "chosen_route": <пълните данни за маршрута>
     }
     """
-    _ensure_configured()
-
     if not routes:
         raise Exception("Няма маршрути за оценяване.")
 
@@ -193,6 +191,7 @@ def score_routes_with_ai(routes, profile, needs, notes=""):
     prompt = build_prompt(routes, profile, needs, notes)
 
     try:
+        _ensure_configured()
         response = _client.chat.completions.create(
             model="grok-3-mini",
             max_tokens=4096,
