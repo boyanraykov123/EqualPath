@@ -238,6 +238,8 @@ gi('btn-logout').addEventListener('click', async () => {
   gi('user-chip').style.display = 'none';
   gi('profile-user-banner').classList.remove('vis');
   gi('user-menu').style.display = 'none';
+  gi('login-email').value = '';
+  gi('login-pw').value = '';
   // презареди маркерите за да се скрие бутон "Премахни"
   reloadObstacles();
   toast('Излязохте от профила.');
