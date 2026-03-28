@@ -558,7 +558,7 @@ def internal_error(e):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 if __name__ == "__main__":
-    port = int(os.getenv("FLASK_PORT", 5000))
+    port = int(os.getenv("PORT", os.getenv("FLASK_PORT", 5000)))
     print(f"\n  EqualPath Backend v1.0")
     print(f"  http://localhost:{port}\n")
     print(f"  POST /api/route         <- route")
