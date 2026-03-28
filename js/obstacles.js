@@ -95,7 +95,7 @@ gi('report-form').addEventListener('submit', async e => {
         location: `${ll.lat.toFixed(5)}, ${ll.lng.toFixed(5)}`,
         user_id: S.user?.id || null,
       }),
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(15000),
     });
     const json = await resp.json();
     if (json.ok) {
