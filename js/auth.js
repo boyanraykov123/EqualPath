@@ -165,12 +165,17 @@ gi('btn-do-register').addEventListener('click', async () => {
 
     const userId = authData.user?.id || '';
 
-    // Профил в profiles таблицата (fire-and-forget)
-    fetch(`${API_BASE}/api/profiles`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: userId, full_name: name, health_needs: needs, password: pw }),
-    }).catch(() => {});
+    // Профил в profiles таблицата
+    try {
+      const profResp = await fetch(`${API_BASE}/api/profiles`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId, full_name: name, health_needs: needs, password: pw }),
+      });
+      if (!profResp.ok) console.warn('[auth] Profile creation response not ok:', profResp.status);
+    } catch (profErr) {
+      console.warn('[auth] Profile creation failed, will be auto-created on first report:', profErr);
+    }
 
     // logIn локално и затвори
     const newUser = { id: userId, name, email, profile, needs, notes };

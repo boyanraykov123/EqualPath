@@ -304,12 +304,23 @@ def create_report():
         try:
             db_check = get_db()
             profile_check = db_check.table("profiles").select("user_id").eq("user_id", body["user_id"]).execute()
-            if profile_check.data:
+            if profile_check.data and len(profile_check.data) > 0:
                 report["user_id"] = body["user_id"]
             else:
-                print(f"[reports] user_id {body['user_id']} not in profiles, skipping")
-        except Exception:
-            print(f"[reports] Could not verify user_id, skipping")
+                # Профилът липсва — създаваме минимален профил автоматично
+                print(f"[reports] user_id {body['user_id']} not in profiles, creating minimal profile")
+                try:
+                    db_check.table("profiles").insert({
+                        "user_id": body["user_id"],
+                        "full_name": "",
+                        "health_needs": [],
+                    }).execute()
+                    report["user_id"] = body["user_id"]
+                    print(f"[reports] Minimal profile created for {body['user_id']}")
+                except Exception as profile_err:
+                    print(f"[reports] Could not create profile: {profile_err}, saving report without user_id")
+        except Exception as e:
+            print(f"[reports] Could not verify user_id: {e}, skipping")
 
     # Снимка (по избор)
     if body.get("photo_url"):
