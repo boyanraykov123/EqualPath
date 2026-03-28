@@ -159,7 +159,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--surface);color:var(--ink)
 #map-mode-badge.visible{display:block}
 
 /* ── FAB Report ──────────────────────────────────────────── */
-#fab-report{position:absolute;bottom:2rem;right:1.5rem;z-index:500;display:flex;align-items:center;gap:.5rem;padding:.875rem 1.25rem;background:var(--red);color:var(--white);font-family:'DM Sans',sans-serif;font-size:.9375rem;font-weight:600;border:none;border-radius:100px;cursor:pointer;box-shadow:0 4px 18px rgba(220,38,38,.4);transition:all .15s;white-space:nowrap}
+#fab-report{position:absolute;bottom:2rem;right:1.5rem;z-index:500;display:flex;align-items:center;gap:.5rem;padding:.875rem 1.25rem;background:var(--red);color:#ffffff;font-family:'DM Sans',sans-serif;font-size:.9375rem;font-weight:600;border:none;border-radius:100px;cursor:pointer;box-shadow:0 4px 18px rgba(220,38,38,.4);transition:all .15s;white-space:nowrap}
 #fab-report:hover{background:var(--red-dark);transform:translateY(-2px);box-shadow:0 8px 24px rgba(220,38,38,.4)}
 #fab-report:active{transform:scale(.97)}
 
