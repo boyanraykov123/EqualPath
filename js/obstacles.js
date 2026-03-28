@@ -86,18 +86,31 @@ gi('report-form').addEventListener('submit', async e => {
 
   // Изпращаме към backend → Supabase
   let saveFailed = false;
+  const payload = {
+    type, description: desc, latlng: ll,
+    location: `${ll.lat.toFixed(5)}, ${ll.lng.toFixed(5)}`,
+    user_id: S.user?.id || null,
+  };
   try {
-    const resp = await fetch(`${API_BASE}/api/reports`, {
+    let resp = await fetch(`${API_BASE}/api/reports`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        type, description: desc, latlng: ll,
-        location: `${ll.lat.toFixed(5)}, ${ll.lng.toFixed(5)}`,
-        user_id: S.user?.id || null,
-      }),
+      body: JSON.stringify(payload),
       signal: AbortSignal.timeout(15000),
     });
-    const json = await resp.json();
+    let json = await resp.json();
+    // Ако FK constraint се провали — опитай без user_id
+    if (!json.ok && payload.user_id && json.error && json.error.includes('user_id')) {
+      console.warn('[EqualPath] Profile missing, retrying without user_id');
+      payload.user_id = null;
+      resp = await fetch(`${API_BASE}/api/reports`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(15000),
+      });
+      json = await resp.json();
+    }
     if (json.ok) {
       reportId = json.id;
     } else {
