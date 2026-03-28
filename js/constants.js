@@ -7,7 +7,7 @@ const SOFIA    = [42.6977, 23.3219];
 const NOM      = 'https://nominatim.openstreetmap.org';
 const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
   ? 'http://localhost:5000'
-  : '';
+  : 'https://equalpath.onrender.com';
 
 /* ── Supabase client ──────────────────────────────────────── */
 const SUPABASE_URL = 'https://hclbceguhpomazrjvkkh.supabase.co';

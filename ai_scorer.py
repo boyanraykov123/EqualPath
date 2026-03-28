@@ -124,7 +124,7 @@ OSM характеристики:
 Нормализирани оценки (0=лошо, 1=добро):
   stairs={sc['stairs']} | cobble={sc['cobble']} | kerbs={sc['kerbs']} | steep={sc['steep']} | lighting={sc['lighting']} | obstacles={sc.get('obstacles', 1.0)}
   noise={sc.get('noise', 0.5)} | complexity={sc.get('complexity', 0.5)} | green={sc.get('green', 0.0)} | crossings={sc.get('crossings', 0.0)} | smooth={sc.get('smooth', 0.0)} | tactile={sc.get('tactile', 0.0)}
-{obs_text}"""
+{f"  ⚠ ПРОФИЛ-НАКАЗАНИЕ: {r['profile_penalty']} (маршрутът нарушава критични изисквания за този профил — ИЗБЯГВАЙ!)" if r.get('profile_penalty', 0) > 0 else ""}{obs_text}"""
 
     prompt = f"""Ти си AI асистент за достъпна градска навигация.
 
@@ -161,7 +161,8 @@ OSM характеристики:
 
 def score_routes_with_ai(routes, profile, needs, notes=""):
     """
-    Главна функция: изпраща маршрутите към Gemini и връща решението.
+    Главна функция: избира най-удобния маршрут чрез локално претеглено оценяване.
+    Използва профил-специфични тежести и OSM метрики (без AI API извикване).
 
     Връща речник:
     {
@@ -176,66 +177,42 @@ def score_routes_with_ai(routes, profile, needs, notes=""):
     if not routes:
         raise Exception("Няма маршрути за оценяване.")
 
-    # Ако има само един маршрут, пропускаме AI и връщаме директно
     if len(routes) == 1:
         r = routes[0]
         ci = _calculate_fallback_ci(r, profile, needs)
-        return {
-            "chosen_route_index": 0,
+        return _ensure_obstacle_avoidance({
+            "chosen_route_index": r["index"],
             "comfort_index": ci,
-            "reason": "Намерен е само един маршрут.",
-            "warning": None,
+            "reason": _build_reason(r, profile),
+            "warning": _build_warning(r, profile),
             "route_summary": f"{r['distance_km']} км, {r['duration_min']} мин",
             "chosen_route": r,
-        }
+        }, routes, profile, needs)
 
-    prompt = build_prompt(routes, profile, needs, notes)
+    # Оценяваме всички маршрути по профил-специфичните тежести
+    scored = []
+    for r in routes:
+        ci = _calculate_fallback_ci(r, profile, needs)
+        scored.append((ci, r))
 
-    try:
-        _ensure_configured()
-        response = _model.generate_content(
-            prompt,
-            generation_config=genai.types.GenerationConfig(
-                max_output_tokens=4096,
-                temperature=0.4,
-            ),
-        )
-        raw_text = response.text.strip()
-    except Exception as e:
-        print(f"[ai_scorer] Gemini error: {e}")
-        # Fallback: избираме маршрута с най-добър score без AI
-        fallback = _fallback_score(routes, profile, needs)
-        return _ensure_obstacle_avoidance(fallback, routes, profile, needs)
+    scored.sort(key=lambda x: x[0], reverse=True)
+    best_ci, best_route = scored[0]
 
-    # ── Парсване на JSON отговора ─────────────────────────────────────────────
-    try:
-        clean = raw_text
-        if "```" in clean:
-            clean = clean.split("```")[1]
-            if clean.startswith("json"):
-                clean = clean[4:]
-            clean = clean.split("```")[0]
-        clean = clean.strip()
+    print(f"[scorer] Класиране за профил '{profile}':")
+    for ci, r in scored:
+        pen = r.get("profile_penalty", 0)
+        pen_str = f" [penalty={pen}]" if pen > 0 else ""
+        print(f"[scorer]   Маршрут {r['index']}: CI={ci}{pen_str}")
 
-        result = json.loads(clean)
-
-        idx = int(result.get("chosen_route_index", 0))
-        idx = max(0, min(idx, len(routes) - 1))  # stay in bounds
-
-        ai_result = {
-            "chosen_route_index": idx,
-            "comfort_index":      float(result.get("comfort_index", 5.0)),
-            "reason":             result.get("reason", ""),
-            "warning":            result.get("warning") or None,
-            "route_summary":      result.get("route_summary", ""),
-            "chosen_route":       routes[idx],
-        }
-        return _ensure_obstacle_avoidance(ai_result, routes, profile, needs)
-
-    except (json.JSONDecodeError, KeyError, ValueError) as e:
-        print(f"[ai_scorer] JSON parse грешка: {e}\nRaw: {raw_text[:300]}")
-        fallback = _fallback_score(routes, profile, needs)
-        return _ensure_obstacle_avoidance(fallback, routes, profile, needs)
+    result = {
+        "chosen_route_index": best_route["index"],
+        "comfort_index":      best_ci,
+        "reason":             _build_reason(best_route, profile),
+        "warning":            _build_warning(best_route, profile),
+        "route_summary":      f"{best_route['distance_km']} км, {best_route['duration_min']} мин",
+        "chosen_route":       best_route,
+    }
+    return _ensure_obstacle_avoidance(result, routes, profile, needs)
 
 
 # ── Fallback (без AI) ─────────────────────────────────────────────────────────
@@ -258,17 +235,59 @@ PROFILE_WEIGHTS = {
 
 
 def _calculate_fallback_ci(route, profile, needs):
-    """Изчислява Comfort Index без AI, само по тежести."""
+    """Изчислява Comfort Index по профил-специфични тежести + hard penalty."""
     weights = PROFILE_WEIGHTS.get(profile, PROFILE_WEIGHTS["general"])
     scores  = route.get("scores", {})
+    osm     = route.get("osm", {})
 
     total_weight = sum(weights.values())
     weighted_sum = sum(
         weights.get(key, 1.0) * scores.get(key, 0.5)
         for key in weights
     )
-    # Нормализираме към 1-10
     ci = 1 + 9 * (weighted_sum / total_weight)
+
+    # Hard penalties: критични нарушения драстично намаляват CI
+    if profile in ("wheelchair", "stroller"):
+        stairs = osm.get("stairs_segments", 0)
+        if stairs > 0:
+            ci -= stairs * 3.0  # всяко стълбище сваля с 3 точки
+        cobble = osm.get("cobble_segments", 0)
+        if cobble > 1:
+            ci -= (cobble - 1) * 1.0
+    elif profile == "autism":
+        busy = osm.get("busy_roads_nearby", 0)
+        if busy > 2:
+            ci -= (busy - 2) * 1.5
+        turns = osm.get("significant_turns", 0)
+        if turns > 6:
+            ci -= (turns - 6) * 0.5
+        # Бонус за зелени площи
+        parks = osm.get("parks_nearby", 0)
+        if parks > 0:
+            ci += min(parks * 0.8, 2.5)
+    elif profile == "visual":
+        unlit = osm.get("unlit_segments", 0)
+        if unlit > 1:
+            ci -= (unlit - 1) * 1.5
+    elif profile == "elderly":
+        steep = osm.get("steep_segments", 0)
+        if steep > 0:
+            ci -= steep * 1.5
+        benches = osm.get("benches_nearby", 0)
+        if benches > 0:
+            ci += min(benches * 0.4, 1.5)
+
+    # Profile penalty от routing.py
+    penalty = route.get("profile_penalty", 0)
+    if penalty > 0:
+        ci -= penalty * 2.0
+
+    # Бонус за маршрути генерирани специално за този профил (Overpass waypoints)
+    source = route.get("source", "")
+    if source == f"profile-{profile}":
+        ci += 1.5
+
     return round(min(10.0, max(1.0, ci)), 1)
 
 
@@ -306,6 +325,68 @@ def _ensure_obstacle_avoidance(result, routes, profile, needs):
     result["reason"] = f"Пренасочено за да избегне {chosen_obs} докладвани препятстви{'е' if chosen_obs == 1 else 'я'}. " + result.get("reason", "")
     result["warning"] = "Маршрутът е по-дълъг, но заобикаля докладваните препятствия."
     return result
+
+
+_PROFILE_REASON_LABELS = {
+    "wheelchair": "инвалидна количка",
+    "autism":     "аутизъм/сензорно",
+    "stroller":   "детска количка",
+    "visual":     "зрителни затруднения",
+    "elderly":    "възрастен",
+    "general":    "пешеходен",
+}
+
+def _build_reason(route, profile):
+    """Генерира обяснение за избора на маршрут на базата на OSM данни."""
+    osm = route.get("osm", {})
+    scores = route.get("scores", {})
+    parts = []
+    label = _PROFILE_REASON_LABELS.get(profile, "пешеходен")
+
+    # Позитивни характеристики
+    if scores.get("stairs", 0.5) >= 0.9 and profile in ("wheelchair", "stroller"):
+        parts.append("без стълби")
+    if scores.get("smooth", 0) >= 0.5:
+        parts.append("гладка настилка")
+    if scores.get("green", 0) >= 0.4 and profile in ("autism", "elderly"):
+        parts.append("зелени площи по маршрута")
+    if scores.get("noise", 0.5) >= 0.7 and profile == "autism":
+        parts.append("тих маршрут")
+    if scores.get("lighting", 0.5) >= 0.7 and profile == "visual":
+        parts.append("добро осветление")
+    if scores.get("tactile", 0) >= 0.3 and profile == "visual":
+        parts.append("тактилна настилка")
+    if scores.get("benches", 0) >= 0.3 and profile == "elderly":
+        parts.append("пейки за почивка")
+    if osm.get("footway_segments", 0) >= 3:
+        parts.append("пешеходни зони")
+
+    if parts:
+        return f"Маршрут за {label}: {', '.join(parts)}."
+    return f"Най-удобният маршрут за профил {label}."
+
+
+def _build_warning(route, profile):
+    """Генерира предупреждение ако маршрутът има проблеми за профила."""
+    osm = route.get("osm", {})
+    warnings = []
+
+    if profile in ("wheelchair", "stroller") and osm.get("stairs_segments", 0) > 0:
+        warnings.append(f"{osm['stairs_segments']} стълбищни сегмента")
+    if profile in ("wheelchair", "stroller") and osm.get("cobble_segments", 0) > 2:
+        warnings.append("неравна настилка")
+    if profile == "autism" and osm.get("busy_roads_nearby", 0) > 3:
+        warnings.append("натоварени улици наблизо")
+    if profile == "visual" and osm.get("unlit_segments", 0) > 1:
+        warnings.append("неосветени участъци")
+    if profile == "elderly" and osm.get("steep_segments", 0) > 1:
+        warnings.append("стръмни участъци")
+    if osm.get("reported_obstacles", 0) > 0:
+        warnings.append(f"{osm['reported_obstacles']} докладвани препятствия")
+
+    if warnings:
+        return "Внимание: " + ", ".join(warnings) + "."
+    return None
 
 
 def _fallback_score(routes, profile, needs):

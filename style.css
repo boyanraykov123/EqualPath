@@ -18,10 +18,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--surface);color:var(--ink)
 .logo-wordmark{font-family:'Fraunces',serif;font-weight:900;font-size:1.35rem;color:var(--ink);letter-spacing:-.02em;line-height:1;text-decoration:none}
 .logo-wordmark span{color:var(--brand)}
 .comfort-badge{margin-left:auto;display:flex;align-items:center;gap:.375rem;background:var(--brand-light);border:1.5px solid var(--brand-border);border-radius:100px;padding:.3rem .75rem;font-size:.75rem;font-weight:600;color:#0d4336;position:relative}
+.comfort-badge:hover{cursor: pointer;}
 .ci-tooltip{position:absolute;right:0;top:calc(100% + 8px);background:var(--brand-light);color:var(--brand-dark);border:1.5px solid var(--brand-border);box-shadow:0 10px 30px rgba(16,185,129,0.12);padding:.5rem .8rem;border-radius:10px;font-size:.78rem;line-height:1.3;max-width:300px;white-space:normal;opacity:0;transform:translateY(-6px);transition:opacity .15s,transform .15s;pointer-events:none;z-index:2000}
 .ci-tooltip strong{display:block;font-size:.82rem;margin-bottom:4px}
 .ci-tooltip .ci-body{font-size:.78rem;color:var(--brand-dark);opacity:0.95}
-.comfort-badge:hover .ci-tooltip,.comfort-badge:focus .ci-tooltip{opacity:1;transform:translateY(0);pointer-events:auto}
+.comfort-badge:hover .ci-tooltip,.comfort-badge:focus .ci-tooltip{opacity:1;transform:translateY(0);pointer-events:auto; cursor: pointer;}
 #btn-login{display:flex;align-items:center;gap:.375rem;padding:.5rem 1rem;background:var(--ink);color:var(--white);font-family:'DM Sans',sans-serif;font-size:.875rem;font-weight:600;border:none;border-radius:100px;cursor:pointer;flex-shrink:0;transition:background .15s}
 #btn-login:hover{background:#1f2937}
 #user-chip{display:none;align-items:center;gap:.5rem;padding:.4rem .875rem;background:var(--brand-light);border:1.5px solid var(--brand-border);border-radius:100px;font-size:.8rem;font-weight:600;color:var(--brand-dark);cursor:pointer;border:1.5px solid var(--brand-border)}

@@ -223,9 +223,6 @@ function logIn(user) {
   // синхронизирай нуждите с sidebar филтрите
   applyNeedsToFilters(user.needs);
 
-  // load search history
-  if (user.id) loadHistory(user.id);
-
   // покажи "Запази маршрут" ако има активен маршрут
   if (S.routePoly) gi('btn-save-route').style.display = 'block';
 
@@ -241,7 +238,8 @@ gi('btn-logout').addEventListener('click', async () => {
   gi('user-chip').style.display = 'none';
   gi('profile-user-banner').classList.remove('vis');
   gi('user-menu').style.display = 'none';
-  gi('history-list').innerHTML = '<div id="history-empty" style="font-size:.75rem;color:var(--ink-muted);padding:.25rem 0">Няма търсения.</div>';
+  gi('login-email').value = '';
+  gi('login-pw').value = '';
   // презареди маркерите за да се скрие бутон "Премахни"
   reloadObstacles();
   toast('Излязохте от профила.');
