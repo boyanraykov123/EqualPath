@@ -6,6 +6,31 @@
 
 function gi(id) { return document.getElementById(id); }
 
+/* ── Theme toggle (dark / light) ──────────────────────────── */
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('eq-theme', theme);
+  const sun  = document.getElementById('theme-icon-sun');
+  const moon = document.getElementById('theme-icon-moon');
+  if (sun && moon) {
+    sun.style.display  = theme === 'dark' ? 'none' : 'block';
+    moon.style.display = theme === 'dark' ? 'block' : 'none';
+  }
+}
+
+(function initTheme() {
+  const stored = localStorage.getItem('eq-theme');
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const theme = stored || (prefersDark ? 'dark' : 'light');
+  applyTheme(theme);
+  // Attach click handler directly — DOM is ready since script is at end of body
+  const btn = document.getElementById('theme-toggle');
+  if (btn) btn.addEventListener('click', function() {
+    const current = document.documentElement.getAttribute('data-theme') || 'light';
+    applyTheme(current === 'dark' ? 'light' : 'dark');
+  });
+})();
+
 function esc(s) {
   if (!s) return '';
   return String(s)
