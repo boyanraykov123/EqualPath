@@ -1,1 +1,3 @@
 EqualPath -> https://boyanraykov123.github.io/EqualPath/
+
+Insync
