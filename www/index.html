@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="theme-color" content="#4A90D9"/>
+<title>EqualPath – Навигация за всеки</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,700;0,900;1,700&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+
+<!-- HEADER -->
+<header id="app-header" role="banner">
+  <button id="sidebar-toggle" aria-label="Отвори менюто" aria-expanded="false">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+      <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+    </svg>
+  </button>
+
+  <!-- Centered logo -->
+  <a href="#" class="logo-wordmark">Equal<span>Path</span></a>
+
+  <!-- Right-side controls -->
+  <div class="header-right">
+    <button id="theme-toggle" aria-label="Превключи тъмен/светъл режим">
+      <svg id="theme-icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+      <svg id="theme-icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    </button>
+    <div class="comfort-badge" tabindex="0" aria-describedby="ci-tooltip">
+      <span>Comfort Index</span>
+      <div class="ci-tooltip" id="ci-tooltip" role="tooltip">
+        <strong>Comfort Index</strong>
+        <div class="ci-body">AI оценка 1–10 за удобството на маршрута. Комбинираме OSM анализ и модели за препоръки.</div>
+      </div>
+    </div>
+    <button id="user-chip" style="display:none">
+      <span id="uc-icon">🚶</span>
+      <span id="uc-name"></span>
+      <svg width="10" height="7" viewBox="0 0 10 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M1 1l4 4 4-4"/></svg>
+    </button>
+    <button id="btn-login">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+      Вход
+    </button>
+  </div>
+
+  <!-- Decorative path curves -->
+  <svg class="header-path" aria-hidden="true" preserveAspectRatio="none" viewBox="0 0 1200 60">
+    <path class="hp-line hp-1" d="M-20,45 C150,10 300,55 500,25 S750,50 950,20 S1100,45 1220,30" fill="none"/>
+    <path class="hp-line hp-2" d="M-20,35 C200,55 350,15 550,40 S800,10 1000,38 S1150,20 1220,42" fill="none"/>
+    <path class="hp-line hp-3" d="M-20,50 C100,30 250,52 450,35 S700,55 900,30 S1050,50 1220,25" fill="none"/>
+  </svg>
+</header>
+
+<!-- BODY -->
+<div id="app-body">
+  <aside id="sidebar">
+
+    <div id="profile-user-banner">
+      <div class="pub-avatar" id="pub-av">🚶</div>
+      <div>
+        <div class="pub-name" id="pub-nm"></div>
+      </div>
+    </div>
+
+    <div>
+      <p class="section-title">Маршрут</p>
+      <div style="display:flex;flex-direction:column;gap:.5rem">
+        <div class="geo-wrapper" id="wrapper-from">
+          <div class="geo-input-row">
+            <input type="text" id="input-from" class="geo-input" placeholder="📍 От (начална точка)" autocomplete="off"/>
+            <div class="geo-spinner" id="spinner-from"></div>
+            <button class="geo-clear" id="clear-from">✕</button>
+          </div>
+          <div class="geo-dropdown" id="dropdown-from" role="listbox"></div>
+        </div>
+        <div class="geo-wrapper" id="wrapper-to">
+          <div class="geo-input-row">
+            <input type="text" id="input-to" class="geo-input" placeholder="🏁 До (крайна точка)" autocomplete="off"/>
+            <div class="geo-spinner" id="spinner-to"></div>
+            <button class="geo-clear" id="clear-to">✕</button>
+          </div>
+          <div class="geo-dropdown" id="dropdown-to" role="listbox"></div>
+        </div>
+        <button id="btn-gps-start">📍 Използвай GPS за начало</button>
+        <button id="btn-pick-on-map">🗺️ Избери от картата</button>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div>
+      <p class="section-title">Профил за маршрут</p>
+      <div style="display:flex;flex-direction:column;gap:.4rem">
+        <label class="profile-option"><input type="radio" name="user-profile" value="wheelchair" checked/><span class="profile-card"><span class="profile-icon">♿</span><span><span class="profile-label">Инвалидна количка</span><br><span class="profile-sublabel">Без стъпала и тесни пасажи</span></span></span></label>
+        <label class="profile-option"><input type="radio" name="user-profile" value="autism"/><span class="profile-card"><span class="profile-icon">🧠</span><span><span class="profile-label">Разтройство на социалното развитие</span><br><span class="profile-sublabel">Тихи и спокойни маршрути</span></span></span></label>
+        <label class="profile-option"><input type="radio" name="user-profile" value="stroller"/><span class="profile-card"><span class="profile-icon">👨‍👩‍👧‍👦</span><span><span class="profile-label">Родител с деца</span><br><span class="profile-sublabel">Безопасни и удобни маршрути</span></span></span></label>
+        <label class="profile-option"><input type="radio" name="user-profile" value="general"/><span class="profile-card"><span class="profile-icon">🚶</span><span><span class="profile-label">Общ пешеходец</span><br><span class="profile-sublabel">Стандартен маршрут</span></span></span></label>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div>
+      <p class="section-title">Допълнителни филтри</p>
+      <div style="display:flex;flex-direction:column;gap:.05rem">
+        <label class="filter-option"><input type="checkbox" id="filter-no-stairs" checked/><span class="filter-label">🚫 Избягвай стълби</span></label>
+        <label class="filter-option"><input type="checkbox" id="filter-quiet"/><span class="filter-label">🔇 Тихи улици</span></label>
+        <label class="filter-option"><input type="checkbox" id="filter-smooth"/><span class="filter-label">🛣️ Гладка настилка</span></label>
+        <label class="filter-option"><input type="checkbox" id="filter-no-crowds"/><span class="filter-label">👥 Избягвай тълпи</span></label>
+        <label class="filter-option"><input type="checkbox" id="filter-shade"/><span class="filter-label">🌳 Сенчести маршрути</span></label>
+        <label class="filter-option"><input type="checkbox" id="filter-benches"/><span class="filter-label">🪑 Пейки</span></label>
+        <label class="filter-option"><input type="checkbox" id="filter-toilets"/><span class="filter-label">🚻 Тоалетни</span></label>
+        <label class="filter-option"><input type="checkbox" id="filter-wide"/><span class="filter-label">↔️ Широки тротоари</span></label>
+      </div>
+    </div>
+
+    <div id="route-info">
+      <p class="route-info-title">📊 Резултат от маршрута</p>
+      <div class="route-stats">
+        <div class="route-stat"><div class="route-stat-value"><span id="route-distance">–</span></div><div class="route-stat-label">км</div></div>
+        <div class="route-stat"><div class="route-stat-value"><span id="route-duration">–</span></div><div class="route-stat-label">мин</div></div>
+        <div class="route-stat"><div class="route-stat-value"><span id="route-comfort-score">–</span></div><div class="route-stat-label">CI</div></div>
+      </div>
+      <div class="route-comfort">
+        <div class="comfort-dots" id="comfort-dots">
+          <div class="comfort-dot" data-i="1"></div><div class="comfort-dot" data-i="2"></div><div class="comfort-dot" data-i="3"></div>
+          <div class="comfort-dot" data-i="4"></div><div class="comfort-dot" data-i="5"></div><div class="comfort-dot" data-i="6"></div>
+          <div class="comfort-dot" data-i="7"></div><div class="comfort-dot" data-i="8"></div><div class="comfort-dot" data-i="9"></div>
+          <div class="comfort-dot" data-i="10"></div>
+        </div>
+        <span class="comfort-label" id="comfort-label-text">–/10</span>
+      </div>
+      <button id="btn-clear-route">✕ Изчисти маршрута</button>
+      <button id="btn-save-route" style="display:none">💾 Запази маршрут</button>
+    </div>
+    <div style="margin-top:auto">
+      <button id="btn-find-route">🧭 &nbsp;Намери маршрут</button>
+      <p class="btn-hint">Маршрутът се изчислява по<br><strong>Comfort Index</strong>, не по скорост.</p>
+    </div>
+  </aside>
+
+  <main id="map-wrapper">
+    <div id="map" tabindex="0"></div>
+    <div id="map-mode-badge"></div>
+    <button id="fab-report"><span>⚠️</span> Докладвай препятствие</button>
+
+    <!-- Mobile: Locate me button -->
+    <button id="btn-locate-me" aria-label="Моето местоположение" title="Моето местоположение">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/>
+      </svg>
+    </button>
+
+    <!-- Mobile: Start navigation button -->
+    <button id="btn-start-nav" aria-label="Старт навигация" title="Навигация">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L4.5 20.3l.7.7L12 18l6.8 3 .7-.7z"/></svg>
+    </button>
+
+    <!-- Navigation panel -->
+    <div id="nav-panel">
+      <div id="nav-instruction">Готов за навигация</div>
+      <button id="btn-stop-nav" class="btn-nav-stop">Спри навигацията</button>
+    </div>
+  </main>
+</div>
+
+
+<!-- AUTH MODAL -->
+<div id="auth-overlay" class="modal-overlay">
+  <div id="auth-modal-box" class="modal-box">
+    <button class="modal-close-x" id="auth-close-x">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="1" y1="1" x2="13" y2="13"/><line x1="13" y1="1" x2="1" y2="13"/></svg>
+    </button>
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="tab-login">Вход</button>
+      <button class="auth-tab" id="tab-register">Регистрация</button>
+    </div>
+
+    <!-- LOGIN -->
+    <div id="panel-login" class="auth-panel active">
+      <h2 class="modal-title">Добре дошъл обратно 👋</h2>
+      <p class="modal-subtitle">Влез в профила си и продължи от там, където си спрял.</p>
+      <form id="login-form" style="display:flex;flex-direction:column;gap:.875rem">
+        <div>
+          <label class="form-label" for="login-email">Имейл</label>
+          <input type="email" id="login-email" class="form-input" placeholder="тебе@пример.бг"/>
+          <p class="form-error" id="login-email-err"></p>
+        </div>
+        <div>
+          <label class="form-label" for="login-pw">Парола</label>
+          <div class="pw-wrap">
+            <input type="password" id="login-pw" class="form-input" placeholder="••••••••" style="padding-right:2.75rem"/>
+            <button type="button" class="pw-toggle" id="toggle-login-pw">👁</button>
+          </div>
+          <p class="form-error" id="login-pw-err"></p>
+        </div>
+        <p class="form-error" id="login-gen-err" style="text-align:center"></p>
+        <button class="btn-full" id="btn-do-login" type="submit">Вход →</button>
+        <p style="text-align:center;font-size:.8rem;color:var(--ink-muted)">Нямаш профил? <button id="to-register" style="background:none;border:none;color:var(--brand);font-weight:600;cursor:pointer;font-size:.8rem">Регистрирай се</button></p>
+      </form>
+    </div>
+
+    <!-- REGISTER -->
+    <div id="panel-register" class="auth-panel">
+      <div class="step-bar">
+        <div class="step-dot active" id="sd1"></div>
+        <div class="step-dot" id="sd2"></div>
+        <div class="step-dot" id="sd3"></div>
+        <span class="step-lbl" id="step-lbl">Стъпка 1 от 3</span>
+      </div>
+
+      <!-- Step 1 -->
+      <div class="onboarding-step active" id="reg-s1">
+        <h2 class="modal-title">Създай профил ✨</h2>
+        <p class="modal-subtitle">Само 3 бързи стъпки и сме готови.</p>
+        <form id="reg-form-s1" style="display:flex;flex-direction:column;gap:.875rem">
+          <div>
+            <label class="form-label" for="reg-name">Твоето ime</label>
+            <input type="text" id="reg-name" class="form-input" placeholder="Иван Иванов"/>
+            <p class="form-error" id="reg-name-err"></p>
+          </div>
+          <div>
+            <label class="form-label" for="reg-email">Имейл</label>
+            <input type="email" id="reg-email" class="form-input" placeholder="тебе@пример.бг"/>
+            <p class="form-error" id="reg-email-err"></p>
+          </div>
+          <div>
+            <label class="form-label" for="reg-pw">Парола</label>
+            <div class="pw-wrap">
+              <input type="password" id="reg-pw" class="form-input" placeholder="мин. 8 символа" style="padding-right:2.75rem"/>
+              <button type="button" class="pw-toggle" id="toggle-reg-pw">👁</button>
+            </div>
+            <p class="form-error" id="reg-pw-err"></p>
+          </div>
+          <p class="form-error" id="reg-s1-err" style="text-align:center"></p>
+          <button class="btn-full" id="reg-next-1" type="submit">Напред →</button>
+          <p style="text-align:center;font-size:.8rem;color:var(--ink-muted)">Вече имаш профил? <button id="to-login" style="background:none;border:none;color:var(--brand);font-weight:600;cursor:pointer;font-size:.8rem">Влез</button></p>
+        </form>
+      </div>
+
+      <!-- Step 2 -->
+      <div class="onboarding-step" id="reg-s2">
+        <h2 class="modal-title">Какъв е твоят профил? 🧭</h2>
+        <p class="modal-subtitle">Избери основния си профил — ще намираме по-подходящи маршрути за теб.</p>
+        <div class="access-grid">
+          <label class="access-card-opt"><input type="radio" name="reg-profile" value="wheelchair"/><span class="access-card"><span class="access-card-icon">♿</span><span class="access-card-name">Инвалидна количка</span><span class="access-card-sub">Рампи, без стъпала</span></span></label>
+          <label class="access-card-opt"><input type="radio" name="reg-profile" value="autism"/><span class="access-card"><span class="access-card-icon">🧠</span><span class="access-card-name">Разтройство на социалното развитие</span><span class="access-card-sub">Тихо, малко хора</span></span></label>
+          <label class="access-card-opt"><input type="radio" name="reg-profile" value="stroller"/><span class="access-card"><span class="access-card-icon">👨‍👩‍👧‍👦</span><span class="access-card-name">Родител с дете</span><span class="access-card-sub">Гладки пътеки</span></span></label>
+          <label class="access-card-opt"><input type="radio" name="reg-profile" value="general" checked/><span class="access-card"><span class="access-card-icon">🚶</span><span class="access-card-name">Общ пешеходец</span><span class="access-card-sub">Без ограничения</span></span></label>
+        </div>
+        <p class="form-error" id="reg-s2-err"></p>
+        <div class="modal-actions">
+          <button class="btn-cancel" id="reg-back-2">← Назад</button>
+          <button class="btn-primary" id="reg-next-2">Напред →</button>
+        </div>
+      </div>
+
+      <!-- Step 3 -->
+      <div class="onboarding-step" id="reg-s3">
+        <h2 class="modal-title">Специфични нужди 🎯</h2>
+        <p class="modal-subtitle">Отбележи всичко, което важи за теб. Маршрутите ще се приоритизират според тези фактори.</p>
+        <div class="needs-grid">
+          <label class="need-chip-opt"><input type="checkbox" name="reg-needs" value="no-stairs"/><span class="need-chip">🚫 Избягвай стълби</span></label>
+          <label class="need-chip-opt"><input type="checkbox" name="reg-needs" value="quiet"/><span class="need-chip">🔇 Тихи улици</span></label>
+          <label class="need-chip-opt"><input type="checkbox" name="reg-needs" value="smooth"/><span class="need-chip">🛣️ Гладка настилка</span></label>
+          <label class="need-chip-opt"><input type="checkbox" name="reg-needs" value="no-crowds"/><span class="need-chip">👥 Избягвай тълпи</span></label>
+          <label class="need-chip-opt"><input type="checkbox" name="reg-needs" value="shade"/><span class="need-chip">🌳 Сенчести маршрути</span></label>
+          <label class="need-chip-opt"><input type="checkbox" name="reg-needs" value="benches"/><span class="need-chip">🪑 Пейки</span></label>
+          <label class="need-chip-opt"><input type="checkbox" name="reg-needs" value="toilets"/><span class="need-chip">🚻 Тоалетни</span></label>
+          <label class="need-chip-opt"><input type="checkbox" name="reg-needs" value="wide"/><span class="need-chip">↔️ Широки тротоари</span></label>
+        </div>
+        <div style="margin-bottom:.75rem">
+          <label class="form-label" for="reg-notes">Нещо важно, което да знаем? <span style="color:var(--ink-faint);font-weight:400">(по избор)</span></label>
+          <textarea id="reg-notes" class="form-textarea" placeholder="Напр: Използвам проходилка. Трудно ми е при наклони..."></textarea>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-cancel" id="reg-back-3">← Назад</button>
+          <button class="btn-primary" id="btn-do-register">✅ Готово!</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- USER MENU -->
+<div id="user-menu">
+  <div style="padding:.875rem 1rem .5rem;border-bottom:1px solid var(--border-soft)">
+    <div style="font-size:.8rem;font-weight:700;color:var(--ink)" id="um-name"></div>
+    <div style="font-size:.72rem;color:var(--ink-muted)" id="um-email"></div>
+  </div>
+  <button id="btn-account" style="width:100%;padding:.75rem 1rem;background:none;border:none;text-align:left;font-family:'DM Sans',sans-serif;font-size:.875rem;font-weight:500;color:var(--ink);cursor:pointer;border-bottom:1px solid var(--border-soft)">👤 Моят профил</button>
+  <button id="btn-logout" style="width:100%;padding:.75rem 1rem;background:none;border:none;text-align:left;font-family:'DM Sans',sans-serif;font-size:.875rem;font-weight:500;color:var(--red);cursor:pointer">🚪 Изход</button>
+</div>
+
+
+<!-- ACCOUNT MODAL -->
+<div id="account-overlay" class="modal-overlay">
+  <div id="account-modal-box" class="modal-box" style="max-width:540px;padding:2rem;max-height:90vh;overflow-y:auto;scrollbar-width:thin">
+    <button class="modal-close-x" id="account-close-x">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="1" y1="1" x2="13" y2="13"/><line x1="13" y1="1" x2="1" y2="13"/></svg>
+    </button>
+    <h2 class="modal-title">👤 Моят профил</h2>
+    <p class="modal-subtitle">Управлявай данните и маршрутите си.</p>
+
+    <!-- Лични данни -->
+    <div class="acc-section">
+      <div class="acc-section-header" data-toggle="acc-profile">
+        <span>✏️ Лични данни</span>
+        <svg class="acc-chevron" width="12" height="8" viewBox="0 0 12 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M1 1l5 5 5-5"/></svg>
+      </div>
+      <div class="acc-section-body" id="acc-profile">
+        <form id="edit-profile-form" style="display:flex;flex-direction:column;gap:.75rem">
+          <div>
+            <label class="form-label" for="edit-name">Име</label>
+            <input id="edit-name" class="form-input" placeholder="Твоето име"/>
+          </div>
+          <div>
+            <label class="form-label" for="edit-email">Имейл</label>
+            <input id="edit-email" class="form-input" type="email" placeholder="email@example.com"/>
+          </div>
+          <div>
+            <label class="form-label" for="edit-pw">Нова парола <span style="color:var(--ink-faint);font-weight:400">(остави празно ако не искаш да сменяш)</span></label>
+            <input id="edit-pw" class="form-input" type="password" placeholder="Мин. 8 символа"/>
+          </div>
+          <p class="form-error" id="edit-profile-err"></p>
+          <button type="submit" class="btn-full">Запази промените</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Специални нужди -->
+    <div class="acc-section">
+      <div class="acc-section-header" data-toggle="acc-needs">
+        <span>🎯 Специални нужди</span>
+        <svg class="acc-chevron" width="12" height="8" viewBox="0 0 12 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M1 1l5 5 5-5"/></svg>
+      </div>
+      <div class="acc-section-body" id="acc-needs">
+        <div class="needs-grid" style="margin-bottom:.75rem">
+          <label class="need-chip-opt"><input type="checkbox" name="edit-needs" value="no-stairs"/><span class="need-chip">🚫 Избягвай стълби</span></label>
+          <label class="need-chip-opt"><input type="checkbox" name="edit-needs" value="quiet"/><span class="need-chip">🔇 Тихи улици</span></label>
+          <label class="need-chip-opt"><input type="checkbox" name="edit-needs" value="smooth"/><span class="need-chip">🛣️ Гладка настилка</span></label>
+          <label class="need-chip-opt"><input type="checkbox" name="edit-needs" value="no-crowds"/><span class="need-chip">👥 Избягвай тълпи</span></label>
+          <label class="need-chip-opt"><input type="checkbox" name="edit-needs" value="shade"/><span class="need-chip">🌳 Сенчести маршрути</span></label>
+          <label class="need-chip-opt"><input type="checkbox" name="edit-needs" value="benches"/><span class="need-chip">🪑 Пейки</span></label>
+          <label class="need-chip-opt"><input type="checkbox" name="edit-needs" value="toilets"/><span class="need-chip">🚻 Тоалетни</span></label>
+          <label class="need-chip-opt"><input type="checkbox" name="edit-needs" value="wide"/><span class="need-chip">↔️ Широки тротоари</span></label>
+        </div>
+        <p class="form-error" id="edit-needs-err"></p>
+        <button id="btn-save-needs" class="btn-full">Запази нуждите</button>
+      </div>
+    </div>
+
+    <!-- Запазени маршрути -->
+    <div class="acc-section">
+      <div class="acc-section-header" data-toggle="acc-routes">
+        <span>🗺️ Моите маршрути</span>
+        <svg class="acc-chevron" width="12" height="8" viewBox="0 0 12 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M1 1l5 5 5-5"/></svg>
+      </div>
+      <div class="acc-section-body" id="acc-routes">
+        <div id="saved-routes-list">
+          <p style="font-size:.8rem;color:var(--ink-muted)">Няма запазени маршрути.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- OBSTACLE MODAL -->
+<div id="obs-overlay" class="modal-overlay">
+  <div id="obs-modal-box" class="modal-box">
+    <button class="modal-close-x" id="obs-close-x">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="1" y1="1" x2="13" y2="13"/><line x1="13" y1="1" x2="1" y2="13"/></svg>
+    </button>
+    <h2 class="modal-title">⚠️ Докладвай препятствие</h2>
+    <p class="modal-subtitle">Помогни на общността – отбележи временно препятствие.</p>
+    <div id="modal-coords-badge"></div>
+    <form id="report-form" onsubmit="return false">
+      <div style="margin-bottom:.875rem">
+        <label class="form-label" for="obs-type">Тип препятствие</label>
+        <select id="obs-type" class="form-select">
+          <option value="" disabled selected>— Избери тип —</option>
+          <option value="car-on-ramp">🚗 Спряла кола на рампа</option>
+          <option value="construction">🚧 Строителни работи</option>
+          <option value="broken-pavement">🧱 Счупен тротоар</option>
+          <option value="crowd">👥 Голямо струпване</option>
+          <option value="missing-ramp">♿ Липсваща рампа</option>
+          <option value="puddle">💧 Локва / наводнение</option>
+          <option value="other">❓ Друго</option>
+        </select>
+        <p class="form-error" id="obs-type-err"></p>
+      </div>
+      <div>
+        <label class="form-label" for="obs-desc">Описание <span style="color:var(--ink-faint);font-weight:400">(по избор)</span></label>
+        <textarea id="obs-desc" class="form-textarea" placeholder="Опиши накратко..." maxlength="300"></textarea>
+        <p style="font-size:.72rem;color:var(--ink-faint);text-align:right;margin-top:.25rem"><span id="char-count">0</span>/300</p>
+      </div>
+      <p class="form-error" id="obs-gen-err" style="text-align:center"></p>
+      <div class="modal-actions">
+        <button type="button" class="btn-cancel" id="obs-cancel">Отказ</button>
+        <button type="submit" class="btn-primary" id="obs-submit">✅ Изпрати</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- External Libraries -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<!-- Capacitor (native bridge — no-op in browser) -->
+<script src="https://unpkg.com/@nicepkg/gpt-runner@1.4.0" onerror=""></script>
+<script>
+  // Capacitor Core is injected by the native shell; this is a safe no-op for web
+  if (typeof Capacitor === 'undefined') window.Capacitor = { isNativePlatform: () => false, Plugins: {} };
+</script>
+
+<!-- EqualPath JS (load order matters) -->
+<script src="js/utils.js"></script>
+<script src="js/constants.js"></script>
+<script src="js/map.js"></script>
+<script src="js/geocoding.js"></script>
+<script src="js/routing.js"></script>
+<script src="js/obstacles.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/account.js"></script>
+<script src="js/history.js"></script>
+<script src="js/init.js"></script>
+<script src="js/capacitor-bridge.js"></script>
+</body>
+</html>
