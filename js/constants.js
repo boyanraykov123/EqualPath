@@ -5,9 +5,25 @@
 
 const SOFIA    = [42.6977, 23.3219];
 const NOM      = 'https://nominatim.openstreetmap.org';
-const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+var _isNativeCap = false;
+try { _isNativeCap = typeof Capacitor !== 'undefined' && Capacitor.isNativePlatform(); } catch(e) {}
+const API_BASE = (!_isNativeCap && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))
   ? 'http://localhost:5000'
   : 'https://equalpath.onrender.com';
+
+/* Wake up Render server on app load (free tier sleeps after inactivity) */
+var _serverReady = false;
+(function wakeServer() {
+  fetch(API_BASE + '/api/health', { method: 'GET', signal: AbortSignal.timeout(30000) })
+    .then(function(r) { if (r.ok) _serverReady = true; })
+    .catch(function() {
+      setTimeout(function() {
+        fetch(API_BASE + '/api/health', { method: 'GET', signal: AbortSignal.timeout(30000) })
+          .then(function(r) { if (r.ok) _serverReady = true; })
+          .catch(function(){});
+      }, 5000);
+    });
+})();
 
 /* ── Supabase client ──────────────────────────────────────── */
 const SUPABASE_URL = 'https://hclbceguhpomazrjvkkh.supabase.co';

@@ -68,6 +68,7 @@ document.addEventListener('keydown', e => {
 gi('sidebar-toggle').addEventListener('click', () => {
   const sidebar = gi('sidebar');
   const open = sidebar.classList.toggle('is-open');
+  document.body.classList.toggle('sidebar-open', open);
   gi('sidebar-toggle').setAttribute('aria-expanded', String(open));
   gi('sidebar-toggle').setAttribute('aria-label', open ? 'Затвори менюто' : 'Отвори менюто');
 });

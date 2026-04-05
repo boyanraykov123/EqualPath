@@ -29,17 +29,26 @@ async function fetchRouteFromBackend(from, to) {
     user_id: S.user?.id || null,
   };
 
+  const reqBody = JSON.stringify(body);
   let resp;
-  try {
-    resp = await fetch(`${API_BASE}/api/route`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(45000),
-    });
-  } catch (e) {
-    if (e.name === 'TimeoutError') throw new Error('AI сървърът не отговори (timeout). Провери дали е стартиран.');
-    throw new Error('Не може да се свърже с AI сървъра. Стартирай: python app.py');
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      resp = await fetch(`${API_BASE}/api/route`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: reqBody,
+        signal: AbortSignal.timeout(90000),
+      });
+      break;
+    } catch (e) {
+      if (attempt === 0) {
+        // First fail — server may be waking up, wait and retry
+        await new Promise(r => setTimeout(r, 3000));
+        continue;
+      }
+      if (e.name === 'TimeoutError') throw new Error('Сървърът не отговори. Моля, опитайте отново след малко.');
+      throw new Error('Няма връзка със сървъра. Проверете интернет връзката.');
+    }
   }
 
   const data = await resp.json();
@@ -73,6 +82,7 @@ function showRI() { gi('route-info').classList.add('visible'); }
 function hideRI() {
   gi('route-info').classList.remove('visible');
   gi('btn-save-route').style.display = 'none';
+  var navBtn = gi('btn-start-nav'); if (navBtn) navBtn.style.display = 'none';
 }
 
 
@@ -112,6 +122,7 @@ function renderRoute(data) {
 
   showRI();
   gi('btn-save-route').style.display = S.user ? 'block' : 'none';
+  gi('btn-start-nav').style.display = 'block';
   map.fitBounds(S.routePoly.getBounds(), { padding: [50, 50] });
 
   // Запазваме маршрута за възстановяване при refresh
@@ -165,6 +176,7 @@ gi('btn-find-route').addEventListener('click', async () => {
 
 /* ── Бутон „Изчисти маршрута" ─────────────────────────────── */
 function clearMapRoute() {
+  if (typeof isNavigating !== 'undefined' && isNavigating && typeof stopNavigation === 'function') stopNavigation();
   routeL.clearLayers();
   S.routePoly = null;
   S.routeGlow = null;
