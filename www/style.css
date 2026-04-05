@@ -36,14 +36,15 @@
 [data-theme="dark"] .modal-overlay{background:rgba(0,0,0,.65)}
 [data-theme="dark"] #route-info{background:linear-gradient(135deg,var(--brand-light) 0%,#0f2a1f 100%)}
 
-html,body{height:100%}
+html{height:100%;background:var(--surface)}
 body{font-family:'DM Sans',sans-serif;background:var(--surface);color:var(--ink);height:100dvh;display:flex;flex-direction:column;overflow:hidden}
+[data-theme="dark"] html{background:var(--surface)}
 
 /* ── Header ──────────────────────────────────────────────── */
-#app-header{height:var(--header-h);background:var(--white);border-bottom:none;display:flex;align-items:center;padding:0 1.25rem;gap:.75rem;flex-shrink:0;z-index:1000;position:relative;overflow:visible}
+#app-header{height:var(--header-h);background:var(--white);border-bottom:none;display:flex;align-items:center;padding:0 .75rem;gap:.5rem;flex-shrink:0;z-index:1000;position:relative;overflow:visible}
 
 /* Centered logo */
-.logo-wordmark{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-family:'Fraunces',serif;font-weight:900;font-size:1.35rem;color:var(--ink);letter-spacing:-.02em;line-height:1;text-decoration:none;z-index:2;white-space:nowrap}
+.logo-wordmark{font-family:'Fraunces',serif;font-weight:900;font-size:1.35rem;color:var(--ink);letter-spacing:-.02em;line-height:1;text-decoration:none;z-index:2;white-space:nowrap;flex:1;text-align:center;min-width:0}
 .logo-wordmark span{color:var(--brand)}
 
 /* Right controls group */
@@ -152,8 +153,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--surface);color:var(--ink)
 .btn-hint strong{color:var(--brand)}
 
 /* ── Map ─────────────────────────────────────────────────── */
-#map-wrapper{flex:1;position:relative;overflow:hidden}
-#map{width:100%;height:100%}
+#map-wrapper{flex:1;position:relative;overflow:hidden;min-height:0}
+#map{width:100%;height:100%;transition:transform .4s ease;transform-origin:center center}
+body.navigating #map{width:140%;height:140%;margin-left:-20%;margin-top:-20%}
 #map.pick-mode{cursor:crosshair!important}
 #map-mode-badge{position:absolute;top:1rem;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--white);padding:.6rem 1.25rem;border-radius:100px;font-size:.875rem;font-weight:600;font-family:'DM Sans',sans-serif;z-index:1000;pointer-events:none;display:none;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,.2)}
 #map-mode-badge.visible{display:block}
@@ -168,9 +170,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--surface);color:var(--ink)
 #sidebar-toggle:hover{background:var(--border-soft)}
 
 /* ── Modals ──────────────────────────────────────────────── */
-.modal-overlay{position:fixed;inset:0;background:rgba(17,24,39,.55);backdrop-filter:blur(4px);z-index:9000;display:flex;align-items:center;justify-content:center;padding:1rem;opacity:0;pointer-events:none;transition:opacity .2s}
+.modal-overlay{position:fixed;inset:0;background:rgba(17,24,39,.55);backdrop-filter:blur(4px);z-index:9000;display:flex;align-items:center;justify-content:center;padding:1rem;opacity:0;pointer-events:none;transition:opacity .2s;min-height:100vh;min-height:100lvh}
 .modal-overlay.is-open{opacity:1;pointer-events:auto}
-.modal-box{background:var(--white);border-radius:20px;width:100%;box-shadow:0 24px 64px rgba(0,0,0,.18);transform:translateY(16px) scale(.97);transition:transform .25s cubic-bezier(.34,1.56,.64,1);position:relative}
+.modal-box{background:var(--white);border-radius:20px;width:100%;box-shadow:0 24px 64px rgba(0,0,0,.18);transform:translateY(16px) scale(.97);transition:transform .25s cubic-bezier(.34,1.56,.64,1);position:relative;max-height:85vh;max-height:85dvh;overflow-y:auto;scrollbar-width:thin}
 .modal-overlay.is-open .modal-box{transform:none}
 .modal-close-x{position:absolute;top:1rem;right:1rem;width:32px;height:32px;border:none;background:var(--border-soft);border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--ink-muted);transition:background .15s;z-index:10}
 .modal-close-x:hover{background:var(--border)}
@@ -268,9 +270,13 @@ body{font-family:'DM Sans',sans-serif;background:var(--surface);color:var(--ink)
 @media(max-width:768px){
   #sidebar{position:absolute;top:0;left:0;height:100%;transform:translateX(-100%);transition:transform .25s;box-shadow:4px 0 24px rgba(0,0,0,.12);z-index:900}
   #sidebar.is-open{transform:translateX(0)}
+  body.sidebar-open .leaflet-control-zoom{opacity:0;pointer-events:none;transition:opacity .2s}
   #sidebar-toggle{display:flex}
-  .logo-wordmark{font-size:1.1rem}
+  .logo-wordmark{font-size:1.05rem}
   .header-right .comfort-badge{display:none}
+  .header-right{gap:.35rem;flex-shrink:0}
+  #btn-login{padding:.4rem .65rem;font-size:.78rem}
+  #theme-toggle{width:30px;height:30px}
   .header-path{opacity:.5}
   #fab-report{bottom:1.25rem;right:1rem;padding:.75rem 1rem;font-size:.875rem}
 }
@@ -320,82 +326,88 @@ body{font-family:'DM Sans',sans-serif;background:var(--surface);color:var(--ink)
 .sr-btn-del{background:#fef2f2;color:var(--red);border:1px solid #fca5a5}
 .sr-btn-del:hover{background:var(--red);color:#fff}
 
+/* ── GPS Start button ───────────────────────────────────── */
+#btn-gps-start{width:100%;padding:.55rem .875rem;background:var(--brand-light);border:1.5px solid var(--brand-border);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:.8rem;font-weight:600;color:var(--brand-dark);cursor:pointer;text-align:center;transition:all .15s;margin-top:.25rem}
+#btn-gps-start:hover{background:var(--brand);color:#fff;border-color:var(--brand)}
+#btn-gps-start:disabled{opacity:.5;pointer-events:none}
+
+/* ── Map floating buttons ───────────────────────────────── */
+.map-fab{position:absolute;z-index:500;width:46px;height:46px;border-radius:50%;border:none;background:var(--white);box-shadow:0 2px 12px rgba(0,0,0,.15),0 0 0 1px rgba(0,0,0,.04);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--ink-soft);transition:all .2s}
+.map-fab:hover{box-shadow:0 4px 20px rgba(0,0,0,.2);color:var(--brand)}
+.map-fab:active{transform:scale(.9)}
+.locate-fab{bottom:7.5rem;right:1.25rem}
+.locate-fab.locating{color:var(--brand)}
+.locate-fab.locating svg{animation:pulse-locate 1.2s ease infinite}
+.recenter-fab{bottom:11rem;right:1.25rem;display:none;background:var(--brand);color:#fff;box-shadow:0 2px 12px rgba(30,158,117,.4)}
+.recenter-fab:hover{background:var(--brand-dark);color:#fff}
+@keyframes pulse-locate{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
+
+/* ── Start navigation button ────────────────────────────── */
+#btn-start-nav{display:none;width:100%;padding:.85rem;background:linear-gradient(135deg,#4285F4 0%,#1a73e8 100%);color:#fff;font-family:'DM Sans',sans-serif;font-size:.9375rem;font-weight:700;border:none;border-radius:10px;cursor:pointer;transition:all .15s;margin-top:.5rem;box-shadow:0 4px 14px rgba(66,133,244,.3)}
+#btn-start-nav:hover{box-shadow:0 6px 20px rgba(66,133,244,.4);transform:translateY(-1px)}
+#btn-start-nav:active{transform:scale(.97)}
+#btn-start-nav:disabled{opacity:.6;pointer-events:none;transform:none}
+
 /* ═══════════════════════════════════════════════════════════
-   MOBILE APP — Capacitor-specific styles
+   NAVIGATION UI — Google Maps style
    ═══════════════════════════════════════════════════════════ */
 
-/* ── Safe area (notch / bottom bar) ──────────────────────── */
-body{
-  padding-top:env(safe-area-inset-top);
-  padding-bottom:env(safe-area-inset-bottom);
-}
+/* ── Top instruction bar ────────────────────────────────── */
+.nav-top-bar{position:absolute;top:0;left:0;right:0;z-index:800;background:#1a6b54;color:#fff;display:none;flex-direction:column;box-shadow:0 4px 20px rgba(0,0,0,.25);padding-top:env(safe-area-inset-top,0)}
+body.navigating .nav-top-bar{display:flex}
+.nav-turn-row{display:flex;align-items:center;gap:1rem;padding:1rem 1.25rem .75rem}
+.nav-turn-icon{width:48px;height:48px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.nav-turn-body{flex:1;min-width:0}
+.nav-turn-street{font-size:1.2rem;font-weight:700;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nav-next-turn{display:none;padding:.4rem 1.25rem .6rem;font-size:.82rem;font-weight:600;opacity:.85}
+.nav-next-turn.visible{display:flex;align-items:center;gap:.5rem}
 
-/* ── Locate Me button ────────────────────────────────────── */
-#btn-locate-me{
-  position:absolute;bottom:140px;right:12px;z-index:800;
-  width:44px;height:44px;border-radius:50%;border:none;
-  background:var(--white);color:var(--brand);
-  box-shadow:0 2px 8px rgba(0,0,0,.2);
-  display:flex;align-items:center;justify-content:center;
-  cursor:pointer;transition:all .2s;
-}
-#btn-locate-me:active{transform:scale(.9)}
-#btn-locate-me.locating{animation:pulse-locate 1s infinite}
-@keyframes pulse-locate{
-  0%,100%{box-shadow:0 2px 8px rgba(0,0,0,.2)}
-  50%{box-shadow:0 2px 16px rgba(30,158,117,.5)}
-}
+/* ── Bottom sheet ───────────────────────────────────────── */
+.nav-bottom-sheet{position:absolute;bottom:0;left:0;right:0;z-index:800;background:var(--white);border-radius:16px 16px 0 0;box-shadow:0 -2px 24px rgba(0,0,0,.12);transform:translateY(100%);transition:transform .35s cubic-bezier(.32,.72,.32,1);padding-bottom:env(safe-area-inset-bottom,0)}
+body.navigating .nav-bottom-sheet{transform:translateY(0)}
+.nav-handle{width:32px;height:4px;background:var(--border);border-radius:2px;margin:8px auto 0;cursor:grab}
+.nav-sheet-summary{display:flex;align-items:center;padding:.75rem 1rem .75rem 1.25rem;gap:.75rem}
+.nav-eta-block{flex-shrink:0}
+.nav-eta-time{font-family:'Fraunces',serif;font-size:2rem;font-weight:900;color:var(--brand);line-height:1}
+.nav-eta-label{font-size:.65rem;font-weight:600;color:var(--brand);text-transform:uppercase;letter-spacing:.04em}
+.nav-eta-detail{flex:1;font-size:.85rem;color:var(--ink-muted);font-weight:500;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nav-exit-btn{flex-shrink:0;padding:.6rem 1.25rem;background:#dc2626;color:#fff;font-family:'DM Sans',sans-serif;font-size:.875rem;font-weight:700;border:none;border-radius:100px;cursor:pointer;transition:all .15s}
+.nav-exit-btn:hover{background:#b91c1c}
+.nav-exit-btn:active{transform:scale(.95)}
 
-/* ── Start Navigation button ─────────────────────────────── */
-#btn-start-nav{
-  position:absolute;bottom:85px;right:12px;z-index:800;
-  width:44px;height:44px;border-radius:50%;border:none;
-  background:var(--brand);color:#fff;
-  box-shadow:0 2px 8px rgba(0,0,0,.2);
-  display:flex;align-items:center;justify-content:center;
-  cursor:pointer;transition:all .2s;
-}
-#btn-start-nav:active{transform:scale(.9)}
+/* Expanded section */
+.nav-sheet-expanded{display:none;padding:0 1.25rem 1rem;border-top:1px solid var(--border)}
+.nav-bottom-sheet.expanded .nav-sheet-expanded{display:block}
+.nav-info-grid{display:grid;grid-template-columns:1fr 1fr;gap:.6rem;padding-top:.875rem}
+.nav-info-item{background:var(--border-soft);border-radius:10px;padding:.65rem .75rem;display:flex;flex-direction:column;gap:2px}
+.nav-info-icon{font-size:1rem;line-height:1}
+.nav-info-label{font-size:.65rem;color:var(--ink-muted);font-weight:500;text-transform:uppercase;letter-spacing:.03em}
+.nav-info-value{font-size:.9rem;font-weight:700;color:var(--ink)}
+.nav-info-dest{font-size:.78rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nav-progress-track{height:4px;background:var(--border);margin-top:.875rem;border-radius:2px;overflow:hidden}
+.nav-progress-fill{height:100%;background:linear-gradient(90deg,var(--brand),#4285F4);border-radius:2px;transition:width .6s ease;width:0%}
 
-/* ── GPS Start button (in sidebar) ───────────────────────── */
-#btn-gps-start{
-  width:100%;padding:.625rem;border-radius:10px;border:1.5px dashed var(--brand);
-  background:var(--brand-light);color:var(--brand-dark);
-  font-family:'DM Sans',sans-serif;font-size:.8rem;font-weight:600;
-  cursor:pointer;transition:all .15s;
-}
-#btn-gps-start:hover{background:var(--brand);color:#fff}
+/* ── Navigating state ───────────────────────────────────── */
+body.navigating #app-header{display:none}
+body.navigating #sidebar{display:none!important}
+body.navigating #fab-report{display:none}
+body.navigating .locate-fab{bottom:7.5rem;right:1rem}
+body.navigating .recenter-fab{bottom:11rem;right:1rem}
 
-/* ── Navigation panel ────────────────────────────────────── */
-#nav-panel{
-  position:absolute;top:0;left:0;right:0;z-index:900;
-  background:var(--white);border-bottom:2px solid var(--brand);
-  padding:16px;padding-top:calc(16px + env(safe-area-inset-top));
-  display:flex;align-items:center;justify-content:space-between;
-  gap:12px;
-  transform:translateY(-100%);transition:transform .3s ease;
-  box-shadow:0 4px 16px rgba(0,0,0,.15);
-}
-#nav-panel.visible{transform:translateY(0)}
+/* ── Dark mode nav ──────────────────────────────────────── */
+[data-theme="dark"] .nav-top-bar{background:#0f3d2e}
+[data-theme="dark"] .nav-bottom-sheet{box-shadow:0 -2px 24px rgba(0,0,0,.4)}
+[data-theme="dark"] .nav-info-item{background:var(--surface)}
+[data-theme="dark"] .map-fab{box-shadow:0 2px 12px rgba(0,0,0,.3)}
+[data-theme="dark"] .recenter-fab{box-shadow:0 2px 12px rgba(30,158,117,.5)}
 
-#nav-instruction{
-  flex:1;font-family:'DM Sans',sans-serif;font-size:.95rem;
-  font-weight:600;color:var(--ink);
-}
-
-.btn-nav-stop{
-  padding:8px 16px;border-radius:8px;border:none;
-  background:var(--red);color:#fff;
-  font-family:'DM Sans',sans-serif;font-size:.8rem;font-weight:600;
-  cursor:pointer;white-space:nowrap;
-}
-.btn-nav-stop:active{opacity:.8}
-
-/* ── Mobile adjustments ──────────────────────────────────── */
-@media(max-width:700px){
-  #btn-locate-me{bottom:130px;right:10px}
-  #btn-start-nav{bottom:75px;right:10px}
-  #nav-panel{padding:12px;padding-top:calc(12px + env(safe-area-inset-top))}
-  #nav-instruction{font-size:.85rem}
+/* ── Mobile nav responsive ──────────────────────────────── */
+@media(max-width:768px){
+  .locate-fab{bottom:6rem;right:.875rem}
+  .recenter-fab{bottom:9.5rem;right:.875rem}
+  body.navigating .locate-fab{bottom:7rem;right:.875rem}
+  body.navigating .recenter-fab{bottom:10.5rem;right:.875rem}
+  .nav-turn-street{font-size:1.1rem}
+  .nav-eta-time{font-size:1.75rem}
 }
 

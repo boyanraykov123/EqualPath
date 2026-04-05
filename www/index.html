@@ -2,11 +2,7 @@
 <html lang="bg">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no"/>
-<meta name="mobile-web-app-capable" content="yes"/>
-<meta name="apple-mobile-web-app-capable" content="yes"/>
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-<meta name="theme-color" content="#4A90D9"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content"/>
 <title>EqualPath – Навигация за всеки</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
@@ -89,8 +85,8 @@
           </div>
           <div class="geo-dropdown" id="dropdown-to" role="listbox"></div>
         </div>
-        <button id="btn-gps-start">📍 Използвай GPS за начало</button>
         <button id="btn-pick-on-map">🗺️ Избери от картата</button>
+        <button id="btn-gps-start">📍 Използвай GPS за начало</button>
       </div>
     </div>
 
@@ -140,6 +136,7 @@
       </div>
       <button id="btn-clear-route">✕ Изчисти маршрута</button>
       <button id="btn-save-route" style="display:none">💾 Запази маршрут</button>
+      <button id="btn-start-nav">🧭 Стартирай навигация</button>
     </div>
     <div style="margin-top:auto">
       <button id="btn-find-route">🧭 &nbsp;Намери маршрут</button>
@@ -150,24 +147,67 @@
   <main id="map-wrapper">
     <div id="map" tabindex="0"></div>
     <div id="map-mode-badge"></div>
+    <button id="btn-locate-me" class="map-fab locate-fab" aria-label="Моята позиция">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>
+    </button>
+    <button id="btn-recenter" class="map-fab recenter-fab" aria-label="Центрирай">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l19-9-9 19-2-8-8-2z"/></svg>
+    </button>
     <button id="fab-report"><span>⚠️</span> Докладвай препятствие</button>
 
-    <!-- Mobile: Locate me button -->
-    <button id="btn-locate-me" aria-label="Моето местоположение" title="Моето местоположение">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/>
-      </svg>
-    </button>
+    <!-- Navigation: Top instruction bar (Google Maps style) -->
+    <div id="nav-top-bar" class="nav-top-bar">
+      <div class="nav-turn-row">
+        <div class="nav-turn-icon" id="nav-turn-icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+        </div>
+        <div class="nav-turn-body">
+          <div class="nav-turn-street" id="nav-turn-street">Следвайте маршрута</div>
+        </div>
+      </div>
+      <div class="nav-next-turn" id="nav-next-turn"></div>
+    </div>
 
-    <!-- Mobile: Start navigation button -->
-    <button id="btn-start-nav" aria-label="Старт навигация" title="Навигация">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L4.5 20.3l.7.7L12 18l6.8 3 .7-.7z"/></svg>
-    </button>
-
-    <!-- Navigation panel -->
-    <div id="nav-panel">
-      <div id="nav-instruction">Готов за навигация</div>
-      <button id="btn-stop-nav" class="btn-nav-stop">Спри навигацията</button>
+    <!-- Navigation: Bottom sheet -->
+    <div id="nav-bottom-sheet" class="nav-bottom-sheet">
+      <div class="nav-handle" id="nav-sheet-handle"></div>
+      <div class="nav-sheet-summary" id="nav-sheet-summary">
+        <div class="nav-eta-block">
+          <div class="nav-eta-time" id="nav-eta-min">—</div>
+          <div class="nav-eta-label">мин</div>
+        </div>
+        <div class="nav-eta-detail">
+          <span id="nav-eta-dist">—</span> · <span id="nav-eta-arrival">—</span>
+        </div>
+        <button id="btn-stop-nav" class="nav-exit-btn">Спри</button>
+      </div>
+      <div class="nav-sheet-expanded" id="nav-sheet-expanded">
+        <div class="nav-info-grid">
+          <div class="nav-info-item">
+            <div class="nav-info-icon">📍</div>
+            <div class="nav-info-label">GPS точност</div>
+            <div class="nav-info-value" id="nav-accuracy">—</div>
+          </div>
+          <div class="nav-info-item">
+            <div class="nav-info-icon">📊</div>
+            <div class="nav-info-label">Comfort Index</div>
+            <div class="nav-info-value" id="nav-ci">—</div>
+          </div>
+          <div class="nav-info-item">
+            <div class="nav-info-icon">🏁</div>
+            <div class="nav-info-label">Дестинация</div>
+            <div class="nav-info-value nav-info-dest" id="nav-dest-name">—</div>
+          </div>
+          <div class="nav-info-item">
+            <div class="nav-info-icon">🛣️</div>
+            <div class="nav-info-label">Общо разстояние</div>
+            <div class="nav-info-value" id="nav-total-dist">—</div>
+          </div>
+        </div>
+        <div class="nav-progress-track">
+          <div class="nav-progress-fill" id="nav-progress-fill"></div>
+        </div>
+      </div>
     </div>
   </main>
 </div>
@@ -416,13 +456,6 @@
 <!-- External Libraries -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-<!-- Capacitor (native bridge — no-op in browser) -->
-<script src="https://unpkg.com/@nicepkg/gpt-runner@1.4.0" onerror=""></script>
-<script>
-  // Capacitor Core is injected by the native shell; this is a safe no-op for web
-  if (typeof Capacitor === 'undefined') window.Capacitor = { isNativePlatform: () => false, Plugins: {} };
-</script>
 
 <!-- EqualPath JS (load order matters) -->
 <script src="js/utils.js"></script>
