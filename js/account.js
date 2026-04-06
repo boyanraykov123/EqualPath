@@ -12,6 +12,19 @@ function openAccount() {
   gi('edit-name').value = S.user.name || '';
   gi('edit-email').value = S.user.email || '';
   gi('edit-pw').value = '';
+  gi('edit-pw-current').value = '';
+  gi('pw-change-fields').style.display = 'none';
+
+  // Phone field for buddies
+  var phoneWrap = gi('edit-phone-wrap');
+  if (phoneWrap) {
+    phoneWrap.style.display = S.user.role === 'buddy' ? 'block' : 'none';
+    gi('edit-phone').value = S.user.phone || '';
+  }
+
+  // Hide needs section for buddies
+  var needsSection = gi('acc-needs')?.closest('.acc-section');
+  if (needsSection) needsSection.style.display = S.user.role === 'buddy' ? 'none' : 'block';
 
   // Попълни нуждите
   document.querySelectorAll('input[name="edit-needs"]').forEach(cb => {
@@ -46,6 +59,14 @@ document.querySelectorAll('.acc-section-header').forEach(header => {
 });
 
 
+/* ── Password change toggle ──────────────────────────────── */
+gi('btn-pw-toggle').addEventListener('click', function() {
+  var fields = gi('pw-change-fields');
+  var isOpen = fields.style.display !== 'none';
+  fields.style.display = isOpen ? 'none' : 'block';
+  gi('btn-pw-toggle').textContent = isOpen ? '🔒 Промени парола' : '🔒 Скрий';
+});
+
 /* ── Редакция на лични данни ──────────────────────────────── */
 gi('edit-profile-form').addEventListener('submit', async e => {
   e.preventDefault();
@@ -54,16 +75,25 @@ gi('edit-profile-form').addEventListener('submit', async e => {
   const name = gi('edit-name').value.trim();
   const email = gi('edit-email').value.trim();
   const pw = gi('edit-pw').value;
+  const pwCurrent = gi('edit-pw-current').value;
+  const phone = gi('edit-phone')?.value?.trim() || '';
 
   if (!name) { shwE('edit-profile-err', 'Въведи име.'); return; }
   if (!email || !email.includes('@')) { shwE('edit-profile-err', 'Невалиден имейл.'); return; }
   if (pw && pw.length < 8) { shwE('edit-profile-err', 'Паролата трябва да е поне 8 символа.'); return; }
+  if (pw && !pwCurrent) { shwE('edit-profile-err', 'Въведи текущата парола.'); return; }
 
   const btn = e.target.querySelector('button[type="submit"]');
   btn.disabled = true;
   btn.textContent = 'Запазва...';
 
   try {
+    // Verify current password before changing
+    if (pw && pwCurrent) {
+      const { error: verifyErr } = await sb.auth.signInWithPassword({ email: S.user.email, password: pwCurrent });
+      if (verifyErr) { shwE('edit-profile-err', 'Текущата парола е грешна.'); btn.disabled = false; btn.textContent = 'Запази промените'; return; }
+    }
+
     // Обнови всичко през backend (Auth + profiles)
     const resp = await fetch(`${API_BASE}/api/profiles/update-auth`, {
       method: 'POST',
@@ -71,6 +101,7 @@ gi('edit-profile-form').addEventListener('submit', async e => {
       body: JSON.stringify({
         user_id: S.user.id,
         full_name: name,
+        phone: phone,
         ...(email !== S.user.email ? { email } : {}),
         ...(pw ? { password: pw } : {}),
       }),
@@ -81,6 +112,7 @@ gi('edit-profile-form').addEventListener('submit', async e => {
     // Обнови локалното състояние
     S.user.name = name;
     S.user.email = email;
+    if (phone) S.user.phone = phone;
     gi('uc-name').textContent = name.split(' ')[0];
     gi('um-name').textContent = name;
     gi('um-email').textContent = email;

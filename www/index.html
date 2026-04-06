@@ -138,6 +138,15 @@
       <button id="btn-save-route" style="display:none">💾 Запази маршрут</button>
       <button id="btn-start-nav">🧭 Стартирай навигация</button>
     </div>
+    <div class="divider"></div>
+
+    <div id="buddy-section">
+      <p class="section-title">🤝 Buddy система</p>
+      <button id="btn-buddy-request" class="buddy-action-btn">🆘 Имам нужда от Buddy</button>
+      <button id="btn-buddy-browse" class="buddy-action-btn buddy-browse">💚 Виж заявки за помощ</button>
+      <button id="btn-buddy-my" class="buddy-action-btn" style="display:none">📋 Моите заявки</button>
+    </div>
+
     <div style="margin-top:auto">
       <button id="btn-find-route">🧭 &nbsp;Намери маршрут</button>
       <p class="btn-hint">Маршрутът се изчислява по<br><strong>Comfort Index</strong>, не по скорост.</p>
@@ -244,7 +253,10 @@
         </div>
         <p class="form-error" id="login-gen-err" style="text-align:center"></p>
         <button class="btn-full" id="btn-do-login" type="submit">Вход →</button>
-        <p style="text-align:center;font-size:.8rem;color:var(--ink-muted)">Нямаш профил? <button id="to-register" style="background:none;border:none;color:var(--brand);font-weight:600;cursor:pointer;font-size:.8rem">Регистрирай се</button></p>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:.25rem">
+          <button type="button" id="btn-forgot-pw" style="background:none;border:none;color:var(--ink-muted);font-size:.78rem;cursor:pointer;padding:0">Забравена парола?</button>
+          <span style="font-size:.8rem;color:var(--ink-muted)">Нямаш профил? <button id="to-register" style="background:none;border:none;color:var(--brand);font-weight:600;cursor:pointer;font-size:.8rem">Регистрирай се</button></span>
+        </div>
       </form>
     </div>
 
@@ -254,16 +266,17 @@
         <div class="step-dot active" id="sd1"></div>
         <div class="step-dot" id="sd2"></div>
         <div class="step-dot" id="sd3"></div>
-        <span class="step-lbl" id="step-lbl">Стъпка 1 от 3</span>
+        <div class="step-dot" id="sd4"></div>
+        <span class="step-lbl" id="step-lbl">Стъпка 1 от 4</span>
       </div>
 
-      <!-- Step 1 -->
+      <!-- Step 1: Credentials -->
       <div class="onboarding-step active" id="reg-s1">
         <h2 class="modal-title">Създай профил ✨</h2>
-        <p class="modal-subtitle">Само 3 бързи стъпки и сме готови.</p>
+        <p class="modal-subtitle">Само 4 бързи стъпки и сме готови.</p>
         <form id="reg-form-s1" style="display:flex;flex-direction:column;gap:.875rem">
           <div>
-            <label class="form-label" for="reg-name">Твоето ime</label>
+            <label class="form-label" for="reg-name">Твоето име</label>
             <input type="text" id="reg-name" class="form-input" placeholder="Иван Иванов"/>
             <p class="form-error" id="reg-name-err"></p>
           </div>
@@ -286,8 +299,44 @@
         </form>
       </div>
 
-      <!-- Step 2 -->
+      <!-- Step 2: Role selection -->
       <div class="onboarding-step" id="reg-s2">
+        <h2 class="modal-title">Как ще използваш EqualPath? 🤝</h2>
+        <p class="modal-subtitle">Избери ролята си — можеш да я промениш по-късно.</p>
+        <div class="role-grid">
+          <label class="role-card-opt">
+            <input type="radio" name="reg-role" value="user" checked/>
+            <span class="role-card">
+              <span class="role-card-badge user-badge">Потребител</span>
+              <span class="role-card-icon">🧭</span>
+              <span class="role-card-name">Търся достъпни маршрути</span>
+              <span class="role-card-sub">Намирай безопасни пътища, съобразени с твоите нужди. Можеш да поискаш помощ от Buddy за трудни маршрути.</span>
+            </span>
+          </label>
+          <label class="role-card-opt">
+            <input type="radio" name="reg-role" value="buddy"/>
+            <span class="role-card">
+              <span class="role-card-badge buddy-badge">Buddy</span>
+              <span class="role-card-icon">💚</span>
+              <span class="role-card-name">Искам да помагам</span>
+              <span class="role-card-sub">Приемай заявки от хора, които имат нужда от придружител по маршрута. Стани герой в общността!</span>
+            </span>
+          </label>
+        </div>
+        <div id="buddy-phone-field" style="display:none">
+          <label class="form-label" for="reg-phone">Телефонен номер</label>
+          <input type="tel" id="reg-phone" class="form-input" placeholder="+359 88 123 4567"/>
+          <p style="font-size:.72rem;color:var(--ink-faint);margin-top:.25rem">Потребителите ще го видят когато приемеш заявка.</p>
+          <p class="form-error" id="reg-phone-err"></p>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-cancel" id="reg-back-2">← Назад</button>
+          <button class="btn-primary" id="reg-next-2">Напред →</button>
+        </div>
+      </div>
+
+      <!-- Step 3: Accessibility profile -->
+      <div class="onboarding-step" id="reg-s3">
         <h2 class="modal-title">Какъв е твоят профил? 🧭</h2>
         <p class="modal-subtitle">Избери основния си профил — ще намираме по-подходящи маршрути за теб.</p>
         <div class="access-grid">
@@ -296,15 +345,15 @@
           <label class="access-card-opt"><input type="radio" name="reg-profile" value="stroller"/><span class="access-card"><span class="access-card-icon">👨‍👩‍👧‍👦</span><span class="access-card-name">Родител с дете</span><span class="access-card-sub">Гладки пътеки</span></span></label>
           <label class="access-card-opt"><input type="radio" name="reg-profile" value="general" checked/><span class="access-card"><span class="access-card-icon">🚶</span><span class="access-card-name">Общ пешеходец</span><span class="access-card-sub">Без ограничения</span></span></label>
         </div>
-        <p class="form-error" id="reg-s2-err"></p>
+        <p class="form-error" id="reg-s3-err"></p>
         <div class="modal-actions">
-          <button class="btn-cancel" id="reg-back-2">← Назад</button>
-          <button class="btn-primary" id="reg-next-2">Напред →</button>
+          <button class="btn-cancel" id="reg-back-3">← Назад</button>
+          <button class="btn-primary" id="reg-next-3">Напред →</button>
         </div>
       </div>
 
-      <!-- Step 3 -->
-      <div class="onboarding-step" id="reg-s3">
+      <!-- Step 4: Needs -->
+      <div class="onboarding-step" id="reg-s4">
         <h2 class="modal-title">Специфични нужди 🎯</h2>
         <p class="modal-subtitle">Отбележи всичко, което важи за теб. Маршрутите ще се приоритизират според тези фактори.</p>
         <div class="needs-grid">
@@ -322,7 +371,7 @@
           <textarea id="reg-notes" class="form-textarea" placeholder="Напр: Използвам проходилка. Трудно ми е при наклони..."></textarea>
         </div>
         <div class="modal-actions">
-          <button class="btn-cancel" id="reg-back-3">← Назад</button>
+          <button class="btn-cancel" id="reg-back-4">← Назад</button>
           <button class="btn-primary" id="btn-do-register">✅ Готово!</button>
         </div>
       </div>
@@ -367,9 +416,22 @@
             <label class="form-label" for="edit-email">Имейл</label>
             <input id="edit-email" class="form-input" type="email" placeholder="email@example.com"/>
           </div>
-          <div>
-            <label class="form-label" for="edit-pw">Нова парола <span style="color:var(--ink-faint);font-weight:400">(остави празно ако не искаш да сменяш)</span></label>
-            <input id="edit-pw" class="form-input" type="password" placeholder="Мин. 8 символа"/>
+          <div id="edit-phone-wrap" style="display:none">
+            <label class="form-label" for="edit-phone">Телефон</label>
+            <input id="edit-phone" class="form-input" type="tel" placeholder="+359 88 123 4567"/>
+          </div>
+          <div class="pw-change-section">
+            <button type="button" class="btn-pw-change-toggle" id="btn-pw-toggle">🔒 Промени парола</button>
+            <div id="pw-change-fields" style="display:none">
+              <div style="margin-bottom:.5rem">
+                <label class="form-label" for="edit-pw-current">Текуща парола</label>
+                <input id="edit-pw-current" class="form-input" type="password" placeholder="Въведи текущата парола"/>
+              </div>
+              <div>
+                <label class="form-label" for="edit-pw">Нова парола</label>
+                <input id="edit-pw" class="form-input" type="password" placeholder="Мин. 8 символа"/>
+              </div>
+            </div>
           </div>
           <p class="form-error" id="edit-profile-err"></p>
           <button type="submit" class="btn-full">Запази промените</button>
@@ -453,6 +515,73 @@
   </div>
 </div>
 
+<!-- BUDDY REQUEST MODAL -->
+<div id="buddy-req-overlay" class="modal-overlay">
+  <div class="modal-box" style="max-width:480px;padding:1.75rem">
+    <button class="modal-close-x" id="buddy-req-close">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="1" y1="1" x2="13" y2="13"/><line x1="13" y1="1" x2="1" y2="13"/></svg>
+    </button>
+    <h2 class="modal-title">🆘 Заявка за Buddy</h2>
+    <p class="modal-subtitle">Сподели маршрута си и Buddy ще те придружи.</p>
+    <form id="buddy-req-form" style="display:flex;flex-direction:column;gap:.75rem">
+      <div class="geo-wrapper" id="br-wrapper-from">
+        <label class="form-label">От</label>
+        <div class="geo-input-row">
+          <input type="text" id="br-from" class="geo-input" placeholder="📍 Въведи адрес..." autocomplete="off"/>
+          <div class="geo-spinner" id="br-spinner-from"></div>
+          <button type="button" class="geo-clear" id="br-clear-from">✕</button>
+        </div>
+        <div class="geo-dropdown" id="br-dropdown-from" role="listbox"></div>
+      </div>
+      <div class="geo-wrapper" id="br-wrapper-to">
+        <label class="form-label">До</label>
+        <div class="geo-input-row">
+          <input type="text" id="br-to" class="geo-input" placeholder="🏁 Въведи адрес..." autocomplete="off"/>
+          <div class="geo-spinner" id="br-spinner-to"></div>
+          <button type="button" class="geo-clear" id="br-clear-to">✕</button>
+        </div>
+        <div class="geo-dropdown" id="br-dropdown-to" role="listbox"></div>
+      </div>
+      <button type="button" id="br-pick-map" class="br-pick-map-btn">🗺️ Избери от картата</button>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">
+        <div>
+          <label class="form-label">Дата</label>
+          <input type="text" id="br-date" class="form-input" placeholder="Избери дата" readonly/>
+        </div>
+        <div>
+          <label class="form-label">Час</label>
+          <input type="text" id="br-time" class="form-input" placeholder="Избери час" readonly/>
+        </div>
+      </div>
+      <div>
+        <label class="form-label" for="br-note">Бележка <span style="color:var(--ink-faint);font-weight:400">(по избор)</span></label>
+        <textarea id="br-note" class="form-textarea" placeholder="Напр: Използвам инвалидна количка, нуждая се от помощ при рампите..." maxlength="500"></textarea>
+      </div>
+      <p class="form-error" id="br-err" style="text-align:center"></p>
+      <button type="submit" class="btn-full" id="br-submit">📤 Изпрати заявка</button>
+    </form>
+  </div>
+</div>
+
+<!-- BUDDY BROWSE MODAL -->
+<div id="buddy-browse-overlay" class="modal-overlay">
+  <div class="modal-box" style="max-width:540px;padding:1.75rem;max-height:85vh;overflow-y:auto;scrollbar-width:thin">
+    <button class="modal-close-x" id="buddy-browse-close">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="1" y1="1" x2="13" y2="13"/><line x1="13" y1="1" x2="1" y2="13"/></svg>
+    </button>
+    <h2 class="modal-title" id="buddy-browse-title">💚 Заявки за помощ</h2>
+    <p class="modal-subtitle" id="buddy-browse-subtitle">Хора, които имат нужда от Buddy придружител.</p>
+    <div class="buddy-tabs" id="buddy-tabs" style="display:none">
+      <button class="buddy-tab active" data-tab="open">Нови заявки</button>
+      <button class="buddy-tab" data-tab="accepted">Приети</button>
+      <button class="buddy-tab" data-tab="history">История</button>
+    </div>
+    <div id="buddy-list">
+      <p style="font-size:.85rem;color:var(--ink-muted);text-align:center;padding:2rem 0">Зарежда...</p>
+    </div>
+  </div>
+</div>
+
 <!-- External Libraries -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -467,7 +596,9 @@
 <script src="js/auth.js"></script>
 <script src="js/account.js"></script>
 <script src="js/history.js"></script>
+<script src="js/pickers.js"></script>
 <script src="js/init.js"></script>
+<script src="js/buddy.js"></script>
 <script src="js/capacitor-bridge.js"></script>
 </body>
 </html>

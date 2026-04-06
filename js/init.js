@@ -17,6 +17,8 @@
       email: session.user.email,
       profile: meta.profile || ((prof?.health_needs?.length) ? prof.health_needs[0] : 'general'),
       needs: prof?.health_needs || meta.health_needs || [],
+      role: prof?.role || meta.role || 'user',
+      phone: prof?.phone || meta.phone || '',
     };
     logIn(user);
   }

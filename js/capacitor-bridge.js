@@ -19,9 +19,7 @@ var userHasPanned = false;
 var autoFollow = true;
 var navStartTime = null;
 var sheetExpanded = false;
-var currentBearing = 0;
 var prevGPS = null;
-var mapRotation = 0;
 
 /* ── Icons ───────────────────────────────────────────────── */
 var blueDot = L.divIcon({
@@ -113,20 +111,7 @@ function stopWatch() {
 
 function onGPSUpdate(lat, lng, acc) {
   showUserOnMap(lat, lng, acc);
-
-  // Calculate bearing from movement
-  if (prevGPS && isNavigating) {
-    var dist = L.latLng(lat, lng).distanceTo(L.latLng(prevGPS.lat, prevGPS.lng));
-    if (dist > 3) { // Only update bearing if moved > 3m (filter noise)
-      var newBearing = bearing({ lat: prevGPS.lat, lng: prevGPS.lng }, { lat: lat, lng: lng });
-      // Smooth bearing (weighted average)
-      var diff = angleDiff(currentBearing, newBearing);
-      currentBearing = (currentBearing + diff * 0.4 + 360) % 360;
-      rotateMap(currentBearing);
-    }
-  }
   prevGPS = { lat: lat, lng: lng };
-
   if (isNavigating) {
     if (autoFollow && !userHasPanned) map.setView([lat, lng], Math.max(map.getZoom(), 17), { animate: true, duration: 0.5 });
     updateNavigationProgress(lat, lng);
@@ -290,9 +275,6 @@ async function startNavigation() {
     // Progress
     var progEl = gi('nav-progress-fill'); if (progEl) progEl.style.width = '0%';
 
-    // Invalidate map size for the bigger canvas
-    setTimeout(function() { map.invalidateSize(); }, 400);
-
     // Sheet handle drag
     setupSheetDrag();
 
@@ -312,8 +294,6 @@ function stopNavigation() {
   var sheet = gi('nav-bottom-sheet'); if (sheet) sheet.classList.remove('expanded');
   map.off('dragstart', onMapDrag);
   if (userLocationMarker) userLocationMarker.setIcon(blueDot);
-  resetMapRotation();
-  setTimeout(function() { map.invalidateSize(); }, 500);
   toast('Навигацията е спряна');
 }
 
@@ -428,37 +408,6 @@ function updateNavigationProgress(lat, lng) {
       if (turnIcon) turnIcon.innerHTML = turnSVGs['straight'];
       if (nextTurnEl) nextTurnEl.classList.remove('visible');
     }
-  }
-}
-
-/* ── Map rotation ────────────────────────────────────────── */
-function rotateMap(deg) {
-  mapRotation = deg;
-  var mapEl = document.getElementById('map');
-  if (!mapEl) return;
-  mapEl.style.transform = 'rotate(' + (-deg) + 'deg)';
-  // Counter-rotate controls so they stay upright
-  var controls = mapEl.querySelectorAll('.leaflet-control-container');
-  controls.forEach(function(c) { c.style.transform = 'rotate(' + deg + 'deg)'; });
-  // Counter-rotate markers
-  if (userLocationMarker) {
-    var el = userLocationMarker.getElement();
-    if (el) el.style.transform = (el.style.transform || '').replace(/rotate\([^)]*\)/, '') + ' rotate(' + deg + 'deg)';
-  }
-}
-
-function resetMapRotation() {
-  mapRotation = 0;
-  currentBearing = 0;
-  prevGPS = null;
-  var mapEl = document.getElementById('map');
-  if (!mapEl) return;
-  mapEl.style.transform = '';
-  var controls = mapEl.querySelectorAll('.leaflet-control-container');
-  controls.forEach(function(c) { c.style.transform = ''; });
-  if (userLocationMarker) {
-    var el = userLocationMarker.getElement();
-    if (el) el.style.transform = el.style.transform.replace(/rotate\([^)]*\)/, '');
   }
 }
 

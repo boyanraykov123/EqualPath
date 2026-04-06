@@ -402,6 +402,8 @@ def create_profile():
         "user_id":      body["user_id"],
         "full_name":    str(body.get("full_name", ""))[:200],
         "health_needs": body.get("health_needs", []),
+        "role":         str(body.get("role", "user"))[:20],
+        "phone":        str(body.get("phone", ""))[:30],
     }
 
     # Хешираме паролата, ако е подадена
@@ -467,12 +469,15 @@ def update_auth():
         if auth_attrs:
             db.auth.admin.update_user_by_id(user_id, AdminUserAttributes(**auth_attrs))
 
-        # 2. Обнови profiles таблицата (име + парола хеш)
+        # 2. Обнови profiles таблицата (име + парола хеш + телефон)
         profile_update = {}
         if new_name:
             profile_update["full_name"] = new_name[:200]
         if new_pw:
             profile_update["password_hash"] = generate_password_hash(new_pw)
+        new_phone = body.get("phone", None)
+        if new_phone is not None:
+            profile_update["phone"] = str(new_phone)[:30]
 
         if profile_update:
             db.table("profiles").update(profile_update).eq("user_id", user_id).execute()
@@ -539,6 +544,118 @@ def delete_saved_route(route_id):
     try:
         db = get_db()
         db.table("saved_routes").delete().eq("id", route_id).execute()
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Грешка: {e}"}), 500
+
+    return jsonify({"ok": True})
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# /api/buddy-requests  (заявки за помощ)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@app.route("/api/buddy-requests", methods=["POST"])
+def create_buddy_request():
+    """Потребител създава заявка за помощ (нуждая се от buddy)."""
+    try:
+        body = request.get_json(force=True)
+    except Exception:
+        return jsonify({"ok": False, "error": "Невалиден JSON."}), 400
+
+    required = ["user_id", "user_name", "start_location", "end_location", "date"]
+    for f in required:
+        if not body.get(f):
+            return jsonify({"ok": False, "error": f"Липсва {f}."}), 400
+
+    record = {
+        "user_id":        body["user_id"],
+        "user_name":      str(body.get("user_name", ""))[:200],
+        "start_location": str(body.get("start_location", ""))[:500],
+        "end_location":   str(body.get("end_location", ""))[:500],
+        "start_coords":   body.get("start_coords", {}),
+        "end_coords":     body.get("end_coords", {}),
+        "date":           str(body.get("date", ""))[:20],
+        "time":           str(body.get("time", ""))[:10],
+        "note":           str(body.get("note", ""))[:500],
+        "profile":        str(body.get("profile", "general"))[:30],
+        "status":         "open",
+        "buddy_id":       None,
+        "buddy_name":     None,
+    }
+
+    try:
+        db = get_db()
+        result = db.table("buddy_requests").insert(record).execute()
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Грешка: {e}"}), 500
+
+    return jsonify({"ok": True, "id": result.data[0]["id"] if result.data else None})
+
+
+@app.route("/api/buddy-requests", methods=["GET"])
+def get_buddy_requests():
+    """Връща всички отворени заявки за помощ."""
+    try:
+        db = get_db()
+        result = db.table("buddy_requests").select("*").eq("status", "open").order("date", desc=False).execute()
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Грешка: {e}"}), 500
+
+    return jsonify({"ok": True, "requests": result.data, "count": len(result.data)})
+
+
+@app.route("/api/buddy-requests/<request_id>/accept", methods=["POST"])
+def accept_buddy_request(request_id):
+    """Buddy приема заявка за помощ."""
+    try:
+        body = request.get_json(force=True)
+    except Exception:
+        return jsonify({"ok": False, "error": "Невалиден JSON."}), 400
+
+    buddy_id = body.get("buddy_id")
+    buddy_name = body.get("buddy_name", "")
+    buddy_phone = body.get("buddy_phone", "")
+
+    if not buddy_id:
+        return jsonify({"ok": False, "error": "Липсва buddy_id."}), 400
+
+    try:
+        db = get_db()
+        result = db.table("buddy_requests").update({
+            "status": "accepted",
+            "buddy_id": buddy_id,
+            "buddy_name": str(buddy_name)[:200],
+            "buddy_phone": str(buddy_phone)[:30],
+        }).eq("id", request_id).eq("status", "open").execute()
+
+        if not result.data:
+            return jsonify({"ok": False, "error": "Заявката вече е приета или не съществува."}), 404
+
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Грешка: {e}"}), 500
+
+    return jsonify({"ok": True})
+
+
+@app.route("/api/buddy-requests/user/<user_id>", methods=["GET"])
+def get_user_buddy_requests(user_id):
+    """Връща заявките на потребител (и като автор, и като buddy)."""
+    try:
+        db = get_db()
+        as_user = db.table("buddy_requests").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
+        as_buddy = db.table("buddy_requests").select("*").eq("buddy_id", user_id).order("created_at", desc=True).execute()
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Грешка: {e}"}), 500
+
+    return jsonify({"ok": True, "my_requests": as_user.data, "accepted": as_buddy.data})
+
+
+@app.route("/api/buddy-requests/<request_id>", methods=["DELETE"])
+def delete_buddy_request(request_id):
+    """Изтрива заявка за помощ."""
+    try:
+        db = get_db()
+        db.table("buddy_requests").delete().eq("id", request_id).execute()
     except Exception as e:
         return jsonify({"ok": False, "error": f"Грешка: {e}"}), 500
 

@@ -87,6 +87,8 @@ gi('login-form').addEventListener('submit', async (e) => {
       email,
       profile: meta.profile || ((prof?.health_needs?.length) ? prof.health_needs[0] : 'general'),
       needs: prof?.health_needs || meta.health_needs || [],
+      role: prof?.role || meta.role || 'user',
+      phone: prof?.phone || meta.phone || '',
     };
     logIn(user);
     closeAuth();
@@ -108,6 +110,23 @@ gi('btn-do-login').addEventListener('click', (e) => {
   gi('login-form').dispatchEvent(new Event('submit'));
 });
 
+/* ── Забравена парола ───────────────────────────────────── */
+gi('btn-forgot-pw').addEventListener('click', async () => {
+  const email = gi('login-email').value.trim();
+  if (!email || !email.includes('@')) {
+    shwE('login-email-err', 'Въведи имейла си горе, после натисни "Забравена парола".');
+    return;
+  }
+  clrE('login-gen-err');
+  try {
+    const { error } = await sb.auth.resetPasswordForEmail(email);
+    if (error) throw error;
+    toast('📧 Линк за нулиране на паролата е изпратен на ' + email);
+  } catch (err) {
+    shwE('login-gen-err', err.message || 'Грешка при изпращане.');
+  }
+});
+
 
 /* ── Регистрация (стъпки) ────────────────────────────────── */
 let regStep = 1;
@@ -115,12 +134,13 @@ let regStep = 1;
 function showStep(n) {
   regStep = n;
   document.querySelectorAll('.onboarding-step').forEach((s, i) => s.classList.toggle('active', i === n - 1));
-  ['sd1', 'sd2', 'sd3'].forEach((id, i) => {
+  ['sd1', 'sd2', 'sd3', 'sd4'].forEach((id, i) => {
     const el = gi(id);
+    if (!el) return;
     el.classList.toggle('active', i === n - 1);
     el.classList.toggle('done', i < n - 1);
   });
-  gi('step-lbl').textContent = `Стъпка ${n} от 3`;
+  gi('step-lbl').textContent = `Стъпка ${n} от 4`;
 }
 
 gi('reg-form-s1').addEventListener('submit', (e) => {
@@ -139,9 +159,33 @@ gi('reg-next-1').addEventListener('click', (e) => {
   gi('reg-form-s1').dispatchEvent(new Event('submit'));
 });
 
+// Show/hide phone field based on role selection
+document.querySelectorAll('input[name="reg-role"]').forEach(r => {
+  r.addEventListener('change', () => {
+    const phoneField = gi('buddy-phone-field');
+    if (phoneField) phoneField.style.display = r.value === 'buddy' ? 'block' : 'none';
+  });
+});
+
 gi('reg-back-2').addEventListener('click', () => showStep(1));
-gi('reg-next-2').addEventListener('click', () => showStep(3));
+gi('reg-next-2').addEventListener('click', () => {
+  const role = document.querySelector('input[name="reg-role"]:checked')?.value ?? 'user';
+  if (role === 'buddy') {
+    const phone = gi('reg-phone').value.trim();
+    clrE('reg-phone-err');
+    if (!phone || phone.length < 6) {
+      shwE('reg-phone-err', 'Въведи валиден телефонен номер.');
+      return;
+    }
+    // Buddies skip accessibility profile & needs — go straight to finish
+    gi('btn-do-register').click();
+  } else {
+    showStep(3);
+  }
+});
 gi('reg-back-3').addEventListener('click', () => showStep(2));
+gi('reg-next-3').addEventListener('click', () => showStep(4));
+gi('reg-back-4').addEventListener('click', () => showStep(3));
 
 gi('btn-do-register').addEventListener('click', async () => {
   const btn = gi('btn-do-register');
@@ -151,15 +195,17 @@ gi('btn-do-register').addEventListener('click', async () => {
   const name    = gi('reg-name').value.trim();
   const email   = gi('reg-email').value.trim();
   const pw      = gi('reg-pw').value;
-  const profile = document.querySelector('input[name="reg-profile"]:checked')?.value ?? 'general';
-  const needs   = [...document.querySelectorAll('input[name="reg-needs"]:checked')].map(c => c.value);
-  const notes   = gi('reg-notes').value.trim();
+  const role    = document.querySelector('input[name="reg-role"]:checked')?.value ?? 'user';
+  const phone   = gi('reg-phone').value.trim();
+  const profile = role === 'buddy' ? 'general' : (document.querySelector('input[name="reg-profile"]:checked')?.value ?? 'general');
+  const needs   = role === 'buddy' ? [] : [...document.querySelectorAll('input[name="reg-needs"]:checked')].map(c => c.value);
+  const notes   = role === 'buddy' ? '' : gi('reg-notes').value.trim();
 
   try {
     // 1. Supabase Auth signup
     const { data: authData, error: authErr } = await sb.auth.signUp({
       email, password: pw,
-      options: { data: { full_name: name, profile, health_needs: needs } }
+      options: { data: { full_name: name, profile, health_needs: needs, role, phone: phone || '' } }
     });
     if (authErr) throw authErr;
 
@@ -170,7 +216,7 @@ gi('btn-do-register').addEventListener('click', async () => {
       const profResp = await fetch(`${API_BASE}/api/profiles`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: userId, full_name: name, health_needs: needs, password: pw }),
+        body: JSON.stringify({ user_id: userId, full_name: name, health_needs: needs, role, phone: phone || '', password: pw }),
       });
       if (!profResp.ok) console.warn('[auth] Profile creation response not ok:', profResp.status);
     } catch (profErr) {
@@ -178,7 +224,7 @@ gi('btn-do-register').addEventListener('click', async () => {
     }
 
     // logIn локално и затвори
-    const newUser = { id: userId, name, email, profile, needs, notes };
+    const newUser = { id: userId, name, email, profile, needs, notes, role, phone: phone || '' };
     logIn(newUser);
     closeAuth();
     toast(`🎉 Профилът е създаден! Добре дошъл, ${name}!`);
@@ -213,7 +259,7 @@ function logIn(user) {
   gi('btn-login').style.display = 'none';
   const uc = gi('user-chip');
   uc.style.display = 'flex';
-  gi('uc-icon').textContent = PICONS[prof] || '🚶';
+  gi('uc-icon').textContent = user.role === 'buddy' ? '💚' : (PICONS[prof] || '🚶');
   gi('uc-name').textContent = user.name.split(' ')[0];
   gi('um-name').textContent = user.name;
   gi('um-email').textContent = user.email;
@@ -231,6 +277,15 @@ function logIn(user) {
   // покажи "Запази маршрут" ако има активен маршрут
   if (S.routePoly) gi('btn-save-route').style.display = 'block';
 
+  // Buddy section visibility based on role
+  const isBuddy = user.role === 'buddy';
+  const brBtn = gi('btn-buddy-request');
+  const bbBtn = gi('btn-buddy-browse');
+  const bmBtn = gi('btn-buddy-my');
+  if (brBtn) brBtn.style.display = isBuddy ? 'none' : 'block';
+  if (bbBtn) bbBtn.style.display = isBuddy ? 'block' : 'none';
+  if (bmBtn) bmBtn.style.display = isBuddy ? 'none' : 'block';
+
   // презареди маркерите за да се покаже бутон "Премахни"
   reloadObstacles();
 }
@@ -245,6 +300,9 @@ gi('btn-logout').addEventListener('click', async () => {
   gi('user-menu').style.display = 'none';
   gi('login-email').value = '';
   gi('login-pw').value = '';
+  // Reset buddy buttons — show both for logged-out (they will auth-gate anyway)
+  var brBtn = gi('btn-buddy-request'); if (brBtn) brBtn.style.display = 'block';
+  var bbBtn = gi('btn-buddy-browse'); if (bbBtn) bbBtn.style.display = 'block';
   // презареди маркерите за да се скрие бутон "Премахни"
   reloadObstacles();
   toast('Излязохте от профила.');
