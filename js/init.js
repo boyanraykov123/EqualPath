@@ -89,22 +89,19 @@ mkPwToggle('reg-pw', 'toggle-reg-pw');
 
 
 /* ── Password recovery handler ──────────────────────────── */
+var _recoveryHandled = false;
 sb.auth.onAuthStateChange(function(event, session) {
-  if (event !== 'PASSWORD_RECOVERY') return;
+  if (event !== 'PASSWORD_RECOVERY' || _recoveryHandled) return;
+  _recoveryHandled = true;
 
   // Clear URL hash
   history.replaceState(null, '', window.location.pathname);
 
-  // Sign out first so user doesn't auto-login
-  sb.auth.signOut().then(function() {
-    // Clear any logged-in UI
-    if (S.user) {
-      S.user = null;
-      gi('btn-login').style.display = 'flex';
-      gi('user-chip').style.display = 'none';
-      gi('profile-user-banner').classList.remove('vis');
-    }
-  });
+  // Hide any logged-in UI without signing out (we need the session to change password)
+  gi('btn-login').style.display = 'flex';
+  gi('user-chip').style.display = 'none';
+  gi('profile-user-banner').classList.remove('vis');
+  gi('user-menu').style.display = 'none';
 
   // Show password reset form
   var overlay = document.createElement('div');
@@ -125,10 +122,6 @@ sb.auth.onAuthStateChange(function(event, session) {
     '</div>';
   document.body.appendChild(overlay);
 
-  // Re-authenticate with the recovery session to change password
-  var recoveryToken = session?.access_token;
-  var recoveryRefresh = session?.refresh_token;
-
   gi('recovery-submit').addEventListener('click', async function() {
     var pw = gi('recovery-pw').value;
     var pw2 = gi('recovery-pw2').value;
@@ -140,11 +133,11 @@ sb.auth.onAuthStateChange(function(event, session) {
     gi('recovery-submit').textContent = 'Запазва...';
 
     try {
-      // Re-set the recovery session to update password
-      await sb.auth.setSession({ access_token: recoveryToken, refresh_token: recoveryRefresh });
+      // Session is still active from PASSWORD_RECOVERY event — just update
       var result = await sb.auth.updateUser({ password: pw });
       if (result.error) throw result.error;
       await sb.auth.signOut();
+      S.user = null;
       overlay.remove();
       toast('✅ Паролата е сменена! Влез с новата парола.');
     } catch(err) {
