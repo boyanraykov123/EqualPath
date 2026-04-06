@@ -237,12 +237,18 @@ function renderBuddyCard(req, context) {
       '</div>';
   }
 
+  var isCompleted = req.status === 'completed';
   var actionsHTML = '';
-  if (isAccepted) {
+  if (isCompleted) {
+    actionsHTML = '<span class="buddy-completed-label">✅ Завършена</span>';
+  } else if (isAccepted) {
     if (isOwn) {
       actionsHTML = '<span class="buddy-card-hint">💚 Buddy ще те намери на ' + esc(req.date) + '</span>';
     } else {
-      actionsHTML = '<span class="buddy-card-hint">Ще придружиш на ' + esc(req.date) + '</span>';
+      // Buddy sees complete + delete
+      actionsHTML =
+        '<button class="buddy-btn buddy-btn-complete" data-id="' + req.id + '">✅ Завършена</button>' +
+        '<button class="buddy-btn buddy-btn-del" data-id="' + req.id + '">🗑️</button>';
     }
   } else {
     if (isOwn) {
@@ -253,7 +259,7 @@ function renderBuddyCard(req, context) {
   }
 
   var card = document.createElement('div');
-  card.className = 'buddy-card' + (isAccepted ? ' buddy-card-accepted' : '');
+  card.className = 'buddy-card' + (isAccepted ? ' buddy-card-accepted' : '') + (isCompleted ? ' buddy-card-completed' : '');
   card.innerHTML =
     '<div class="buddy-card-header">' +
       '<div class="buddy-card-avatar">' + profileIcon + '</div>' +
@@ -297,9 +303,9 @@ async function loadBuddyRequests() {
           var accepted = data2.accepted || [];
           var today = new Date().toISOString().split('T')[0];
           if (buddyActiveTab === 'accepted') {
-            results = accepted.filter(function(r) { return r.date >= today; });
+            results = accepted.filter(function(r) { return r.status === 'accepted'; });
           } else {
-            results = accepted.filter(function(r) { return r.date < today; });
+            results = accepted.filter(function(r) { return r.status === 'completed' || r.date < today; });
           }
         }
       }
@@ -339,6 +345,9 @@ async function loadBuddyRequests() {
     list.querySelectorAll('.buddy-btn-accept').forEach(function(btn) {
       btn.addEventListener('click', function() { acceptBuddyRequest(btn.dataset.id); });
     });
+    list.querySelectorAll('.buddy-btn-complete').forEach(function(btn) {
+      btn.addEventListener('click', function() { completeBuddyRequest(btn.dataset.id); });
+    });
     list.querySelectorAll('.buddy-btn-del').forEach(function(btn) {
       btn.addEventListener('click', function() { deleteBuddyRequest(btn.dataset.id, btn.closest('.buddy-card')); });
     });
@@ -360,6 +369,23 @@ async function acceptBuddyRequest(id) {
     var data = await resp.json();
     if (!data.ok) throw new Error(data.error);
     toast('💚 Прие заявката! Благодарим ти!');
+    loadBuddyRequests();
+  } catch (err) {
+    toast('Грешка: ' + (err.message || 'Опитай пак'));
+  }
+}
+
+/* ── Complete buddy request ──────────────────────────────── */
+async function completeBuddyRequest(id) {
+  try {
+    var resp = await fetch(API_BASE + '/api/buddy-requests/' + id + '/complete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    var data = await resp.json();
+    if (!data.ok) throw new Error(data.error);
+    toast('✅ Заявката е маркирана като завършена!');
     loadBuddyRequests();
   } catch (err) {
     toast('Грешка: ' + (err.message || 'Опитай пак'));

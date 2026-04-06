@@ -520,6 +520,59 @@
   </div>
 </div>
 
+<!-- ROUTE LOADING OVERLAY -->
+<div id="route-loading-overlay" class="route-loading-overlay">
+  <div class="route-loading-card">
+    <div class="rl-header">
+      <div class="rl-logo">Equal<span>Path</span></div>
+      <div class="rl-subtitle">Намираме най-добрия маршрут за теб</div>
+    </div>
+    <div class="rl-countdown" id="rl-countdown">30</div>
+    <div class="rl-countdown-label">секунди</div>
+    <div class="rl-steps">
+      <div class="rl-step active" id="rl-step-1">
+        <div class="rl-step-icon"><div class="rl-step-check"></div></div>
+        <div class="rl-step-body">
+          <div class="rl-step-title">Изчисляваме маршрути</div>
+          <div class="rl-step-desc">Търсим 3 алтернативни пътя между точките</div>
+        </div>
+      </div>
+      <div class="rl-step" id="rl-step-2">
+        <div class="rl-step-icon"><div class="rl-step-check"></div></div>
+        <div class="rl-step-body">
+          <div class="rl-step-title">Анализираме улиците</div>
+          <div class="rl-step-desc">Проверяваме стълби, настилка, наклони, осветление</div>
+        </div>
+      </div>
+      <div class="rl-step" id="rl-step-3">
+        <div class="rl-step-icon"><div class="rl-step-check"></div></div>
+        <div class="rl-step-body">
+          <div class="rl-step-title">AI оценява комфорта</div>
+          <div class="rl-step-desc">Gemini AI избира най-удобния маршрут за твоя профил</div>
+        </div>
+      </div>
+      <div class="rl-step" id="rl-step-4">
+        <div class="rl-step-icon"><div class="rl-step-check"></div></div>
+        <div class="rl-step-body">
+          <div class="rl-step-title">Проверяваме за препятствия</div>
+          <div class="rl-step-desc">Търсим докладвани пречки и ги заобикаляме</div>
+        </div>
+      </div>
+      <div class="rl-step" id="rl-step-5">
+        <div class="rl-step-icon"><div class="rl-step-check"></div></div>
+        <div class="rl-step-body">
+          <div class="rl-step-title">Маршрутът е готов!</div>
+          <div class="rl-step-desc">Показваме резултата на картата</div>
+        </div>
+      </div>
+    </div>
+    <div class="rl-progress">
+      <div class="rl-progress-fill" id="rl-progress-fill"></div>
+    </div>
+    <div class="rl-tip" id="rl-tip">💡 Comfort Index оценява маршрутите по 10+ фактора за удобство</div>
+  </div>
+</div>
+
 <!-- BUDDY REQUEST MODAL -->
 <div id="buddy-req-overlay" class="modal-overlay">
   <div class="modal-box" style="max-width:480px;padding:1.75rem">

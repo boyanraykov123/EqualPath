@@ -139,12 +139,18 @@ async function locateMe() {
 async function setStartFromGPS() {
   var btn = gi('btn-gps-start'); if (btn) { btn.disabled = true; btn.textContent = '📍 Търся GPS...'; }
   try {
-    var pos = await getGPSPosition();
-    var lat = pos.coords.latitude, lng = pos.coords.longitude;
+    var lat, lng, acc;
+    if (lastGPS && lastGPS.lat) {
+      // Use cached position — instant
+      lat = lastGPS.lat; lng = lastGPS.lng; acc = lastGPS.acc;
+    } else {
+      var pos = await getGPSPosition();
+      lat = pos.coords.latitude; lng = pos.coords.longitude; acc = pos.coords.accuracy;
+    }
     var label = await reverseGeocode(lat, lng);
     gi('input-from').value = label; gi('input-from').classList.add('is-set'); gi('clear-from').classList.add('visible');
     S.from = { lat: lat, lng: lng, label: label };
-    setA([lat, lng], label); showUserOnMap(lat, lng, pos.coords.accuracy);
+    setA([lat, lng], label); showUserOnMap(lat, lng, acc);
     if (gpsWatchId === null) startWatch();
     toast('Начална точка от GPS');
   } catch(e) { toast(e.message || 'GPS грешка'); }

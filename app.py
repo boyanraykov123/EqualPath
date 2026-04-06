@@ -650,6 +650,21 @@ def get_user_buddy_requests(user_id):
     return jsonify({"ok": True, "my_requests": as_user.data, "accepted": as_buddy.data})
 
 
+@app.route("/api/buddy-requests/<request_id>/complete", methods=["POST"])
+def complete_buddy_request(request_id):
+    """Buddy маркира заявка като завършена."""
+    try:
+        db = get_db()
+        result = db.table("buddy_requests").update({
+            "status": "completed",
+        }).eq("id", request_id).eq("status", "accepted").execute()
+        if not result.data:
+            return jsonify({"ok": False, "error": "Заявката не е намерена."}), 404
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Грешка: {e}"}), 500
+    return jsonify({"ok": True})
+
+
 @app.route("/api/buddy-requests/<request_id>", methods=["DELETE"])
 def delete_buddy_request(request_id):
     """Изтрива заявка за помощ."""

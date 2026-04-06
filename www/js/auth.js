@@ -113,17 +113,30 @@ gi('btn-do-login').addEventListener('click', (e) => {
 /* ── Забравена парола ───────────────────────────────────── */
 gi('btn-forgot-pw').addEventListener('click', async () => {
   const email = gi('login-email').value.trim();
+  clrE('login-email-err'); clrE('login-gen-err');
   if (!email || !email.includes('@')) {
     shwE('login-email-err', 'Въведи имейла си горе, после натисни "Забравена парола".');
     return;
   }
-  clrE('login-gen-err');
+  const btn = gi('btn-forgot-pw');
+  btn.textContent = 'Изпраща...';
+  btn.disabled = true;
   try {
-    const { error } = await sb.auth.resetPasswordForEmail(email);
-    if (error) throw error;
-    toast('📧 Линк за нулиране на паролата е изпратен на ' + email);
+    const siteUrl = window.location.origin + (window.location.pathname.replace(/\/[^/]*$/, '/') || '/');
+    const { error } = await sb.auth.resetPasswordForEmail(email, {
+      redirectTo: siteUrl,
+    });
+    // Always show success for security — don't reveal if email exists
+    if (error && (error.message || '').toLowerCase().includes('rate')) {
+      shwE('login-gen-err', 'Твърде много опити. Опитай по-късно.');
+    } else {
+      toast('📧 Ако имейлът е регистриран, ще получиш линк за нулиране на паролата.');
+    }
   } catch (err) {
-    shwE('login-gen-err', err.message || 'Грешка при изпращане.');
+    toast('📧 Ако имейлът е регистриран, ще получиш линк за нулиране на паролата.');
+  } finally {
+    btn.textContent = 'Забравена парола?';
+    btn.disabled = false;
   }
 });
 

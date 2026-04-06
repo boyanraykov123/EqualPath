@@ -141,6 +141,89 @@ function renderRoute(data) {
 /* Profile metrics removed from UI — function intentionally omitted to simplify sidebar */
 
 
+/* ── Route loading animation ─────────────────────────────── */
+const rlTips = [
+  '💡 Comfort Index оценява маршрутите по 10+ фактора за удобство',
+  '🗺️ Анализираме данни от OpenStreetMap за всяка улица по маршрута',
+  '♿ Проверяваме за стълби, тесни пасажи и неравни настилки',
+  '🤖 Gemini AI избира маршрута с най-висок комфорт за твоя профил',
+  '⚠️ Активните препятствия от общността се заобикалят автоматично',
+  '🌳 Търсим паркове, пейки и сенчести участъци по маршрута',
+  '🚦 Отчитаме светофари и безопасни пешеходни пресичания',
+];
+
+function showRouteLoading() {
+  const overlay = gi('route-loading-overlay');
+  overlay.classList.add('visible');
+
+  // Reset steps
+  for (let i = 1; i <= 5; i++) {
+    const step = gi('rl-step-' + i);
+    step.className = 'rl-step' + (i === 1 ? ' active' : '');
+  }
+  gi('rl-progress-fill').style.width = '0%';
+  gi('rl-tip').textContent = rlTips[0];
+
+  // Countdown from 30
+  let seconds = 30;
+  gi('rl-countdown').textContent = seconds;
+
+  const countdownTimer = setInterval(() => {
+    seconds--;
+    if (seconds < 0) seconds = 0;
+    gi('rl-countdown').textContent = seconds;
+  }, 1000);
+
+  // Step progression
+  const stepTimings = [
+    { step: 1, at: 0, progress: 10 },
+    { step: 2, at: 3000, progress: 30 },
+    { step: 3, at: 8000, progress: 55 },
+    { step: 4, at: 15000, progress: 75 },
+  ];
+
+  const stepTimers = [];
+  stepTimings.forEach(s => {
+    const t = setTimeout(() => {
+      // Mark previous as done
+      for (let i = 1; i < s.step; i++) gi('rl-step-' + i).className = 'rl-step done';
+      // Set current as active
+      gi('rl-step-' + s.step).className = 'rl-step active';
+      gi('rl-progress-fill').style.width = s.progress + '%';
+      // Rotate tip
+      gi('rl-tip').textContent = rlTips[s.step % rlTips.length];
+    }, s.at);
+    stepTimers.push(t);
+  });
+
+  // Rotate tips every 5s
+  let tipIdx = 0;
+  const tipTimer = setInterval(() => {
+    tipIdx = (tipIdx + 1) % rlTips.length;
+    gi('rl-tip').textContent = rlTips[tipIdx];
+  }, 5000);
+
+  return {
+    finish: function() {
+      clearInterval(countdownTimer);
+      clearInterval(tipTimer);
+      stepTimers.forEach(clearTimeout);
+      // Mark all done, show step 5
+      for (let i = 1; i <= 4; i++) gi('rl-step-' + i).className = 'rl-step done';
+      gi('rl-step-5').className = 'rl-step active';
+      gi('rl-progress-fill').style.width = '100%';
+      gi('rl-countdown').textContent = '0';
+      setTimeout(() => overlay.classList.remove('visible'), 800);
+    },
+    cancel: function() {
+      clearInterval(countdownTimer);
+      clearInterval(tipTimer);
+      stepTimers.forEach(clearTimeout);
+      overlay.classList.remove('visible');
+    }
+  };
+}
+
 /* ── Бутон „Намери маршрут" ──────────────────────────────── */
 gi('btn-find-route').addEventListener('click', async () => {
   if (!S.from || !S.to) {
@@ -151,20 +234,27 @@ gi('btn-find-route').addEventListener('click', async () => {
 
   const btn = gi('btn-find-route');
   btn.disabled = true;
+  btn.innerHTML = '⏳ &nbsp;Зарежда...';
 
-  const steps = ['🗺️ &nbsp;Взимам маршрути...', '🔍 &nbsp;Анализирам улиците...', '🤖 &nbsp;AI избира маршрут...'];
-  let si = 0;
-  btn.innerHTML = steps[0];
-  const stepTimer = setInterval(() => { si = (si + 1) % steps.length; btn.innerHTML = steps[si]; }, 2500);
+  // Close sidebar on mobile
+  const sb = gi('sidebar');
+  if (sb && sb.classList.contains('is-open')) {
+    sb.classList.remove('is-open');
+    document.body.classList.remove('sidebar-open');
+  }
+
+  const loader = showRouteLoading();
 
   try {
     const data = await fetchRouteFromBackend(S.from, S.to);
-    clearInterval(stepTimer);
-    renderRoute(data);
-    const obsNote = data.obstacles_on_route > 0 ? ` · ⚠️ ${data.obstacles_on_route} препятстви(я)` : '';
-    toast(`✅ ${data.route_summary} · CI ${data.comfort_index}/10${obsNote}`);
+    loader.finish();
+    setTimeout(() => {
+      renderRoute(data);
+      const obsNote = data.obstacles_on_route > 0 ? ` · ⚠️ ${data.obstacles_on_route} препятстви(я)` : '';
+      toast(`✅ ${data.route_summary} · CI ${data.comfort_index}/10${obsNote}`);
+    }, 900);
   } catch (err) {
-    clearInterval(stepTimer);
+    loader.cancel();
     console.error('[EqualPath]', err);
     toast(`⚠️ ${err.message}`);
   } finally {
