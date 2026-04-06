@@ -142,30 +142,22 @@ function renderRoute(data) {
 
 
 /* ── Route loading animation ─────────────────────────────── */
-const rlTips = [
-  '💡 Comfort Index оценява маршрутите по 10+ фактора за удобство',
-  '🗺️ Анализираме данни от OpenStreetMap за всяка улица по маршрута',
-  '♿ Проверяваме за стълби, тесни пасажи и неравни настилки',
-  '🤖 Gemini AI избира маршрута с най-висок комфорт за твоя профил',
-  '⚠️ Активните препятствия от общността се заобикалят автоматично',
-  '🌳 Търсим паркове, пейки и сенчести участъци по маршрута',
-  '🚦 Отчитаме светофари и безопасни пешеходни пресичания',
+const rlMessages = [
+  'Търсим маршрут...',
+  'Анализираме маршрута...',
+  'Проверяваме улиците...',
+  'Избираме най-удобния път...',
+  'Почти готово...',
 ];
 
 function showRouteLoading() {
   const overlay = gi('route-loading-overlay');
   overlay.classList.add('visible');
-
-  // Reset steps
-  for (let i = 1; i <= 5; i++) {
-    const step = gi('rl-step-' + i);
-    step.className = 'rl-step' + (i === 1 ? ' active' : '');
-  }
   gi('rl-progress-fill').style.width = '0%';
-  gi('rl-tip').textContent = rlTips[0];
+  gi('rl-status').textContent = rlMessages[0];
 
-  // Countdown from 30
-  let seconds = 30;
+  // Estimate time: if server is awake ~15s, if cold ~45s
+  let seconds = _serverReady ? 15 : 45;
   gi('rl-countdown').textContent = seconds;
 
   const countdownTimer = setInterval(() => {
@@ -174,51 +166,35 @@ function showRouteLoading() {
     gi('rl-countdown').textContent = seconds;
   }, 1000);
 
-  // Step progression
-  const stepTimings = [
-    { step: 1, at: 0, progress: 10 },
-    { step: 2, at: 3000, progress: 30 },
-    { step: 3, at: 8000, progress: 55 },
-    { step: 4, at: 15000, progress: 75 },
+  // Simple message rotation + progress
+  const msgTimings = [
+    { at: 0, msg: 0, progress: 5 },
+    { at: 4000, msg: 1, progress: 25 },
+    { at: 10000, msg: 2, progress: 50 },
+    { at: 18000, msg: 3, progress: 70 },
+    { at: 25000, msg: 4, progress: 85 },
   ];
 
-  const stepTimers = [];
-  stepTimings.forEach(s => {
-    const t = setTimeout(() => {
-      // Mark previous as done
-      for (let i = 1; i < s.step; i++) gi('rl-step-' + i).className = 'rl-step done';
-      // Set current as active
-      gi('rl-step-' + s.step).className = 'rl-step active';
+  const timers = [];
+  msgTimings.forEach(s => {
+    timers.push(setTimeout(() => {
+      gi('rl-status').textContent = rlMessages[s.msg];
       gi('rl-progress-fill').style.width = s.progress + '%';
-      // Rotate tip
-      gi('rl-tip').textContent = rlTips[s.step % rlTips.length];
-    }, s.at);
-    stepTimers.push(t);
+    }, s.at));
   });
-
-  // Rotate tips every 5s
-  let tipIdx = 0;
-  const tipTimer = setInterval(() => {
-    tipIdx = (tipIdx + 1) % rlTips.length;
-    gi('rl-tip').textContent = rlTips[tipIdx];
-  }, 5000);
 
   return {
     finish: function() {
       clearInterval(countdownTimer);
-      clearInterval(tipTimer);
-      stepTimers.forEach(clearTimeout);
-      // Mark all done, show step 5
-      for (let i = 1; i <= 4; i++) gi('rl-step-' + i).className = 'rl-step done';
-      gi('rl-step-5').className = 'rl-step active';
+      timers.forEach(clearTimeout);
+      gi('rl-status').textContent = 'Маршрутът е готов!';
       gi('rl-progress-fill').style.width = '100%';
       gi('rl-countdown').textContent = '0';
-      setTimeout(() => overlay.classList.remove('visible'), 800);
+      setTimeout(() => overlay.classList.remove('visible'), 600);
     },
     cancel: function() {
       clearInterval(countdownTimer);
-      clearInterval(tipTimer);
-      stepTimers.forEach(clearTimeout);
+      timers.forEach(clearTimeout);
       overlay.classList.remove('visible');
     }
   };

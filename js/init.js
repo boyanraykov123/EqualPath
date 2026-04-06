@@ -88,5 +88,72 @@ mkPwToggle('login-pw', 'toggle-login-pw');
 mkPwToggle('reg-pw', 'toggle-reg-pw');
 
 
+/* ── Password recovery handler ──────────────────────────── */
+sb.auth.onAuthStateChange(function(event, session) {
+  if (event !== 'PASSWORD_RECOVERY') return;
+
+  // Clear URL hash
+  history.replaceState(null, '', window.location.pathname);
+
+  // Sign out first so user doesn't auto-login
+  sb.auth.signOut().then(function() {
+    // Clear any logged-in UI
+    if (S.user) {
+      S.user = null;
+      gi('btn-login').style.display = 'flex';
+      gi('user-chip').style.display = 'none';
+      gi('profile-user-banner').classList.remove('vis');
+    }
+  });
+
+  // Show password reset form
+  var overlay = document.createElement('div');
+  overlay.className = 'modal-overlay is-open';
+  overlay.style.zIndex = '99999';
+  overlay.innerHTML =
+    '<div class="modal-box" style="max-width:400px;padding:2rem">' +
+      '<h2 class="modal-title">🔒 Нова парола</h2>' +
+      '<p class="modal-subtitle">Въведи новата си парола по-долу.</p>' +
+      '<div style="display:flex;flex-direction:column;gap:.75rem">' +
+        '<div><label class="form-label">Нова парола</label>' +
+        '<input type="password" id="recovery-pw" class="form-input" placeholder="Мин. 8 символа"/></div>' +
+        '<div><label class="form-label">Потвърди паролата</label>' +
+        '<input type="password" id="recovery-pw2" class="form-input" placeholder="Повтори паролата"/></div>' +
+        '<p class="form-error" id="recovery-err"></p>' +
+        '<button class="btn-full" id="recovery-submit">Запази новата парола</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+
+  // Re-authenticate with the recovery session to change password
+  var recoveryToken = session?.access_token;
+  var recoveryRefresh = session?.refresh_token;
+
+  gi('recovery-submit').addEventListener('click', async function() {
+    var pw = gi('recovery-pw').value;
+    var pw2 = gi('recovery-pw2').value;
+    clrE('recovery-err');
+    if (pw.length < 8) { shwE('recovery-err', 'Паролата трябва да е поне 8 символа.'); return; }
+    if (pw !== pw2) { shwE('recovery-err', 'Паролите не съвпадат.'); return; }
+
+    gi('recovery-submit').disabled = true;
+    gi('recovery-submit').textContent = 'Запазва...';
+
+    try {
+      // Re-set the recovery session to update password
+      await sb.auth.setSession({ access_token: recoveryToken, refresh_token: recoveryRefresh });
+      var result = await sb.auth.updateUser({ password: pw });
+      if (result.error) throw result.error;
+      await sb.auth.signOut();
+      overlay.remove();
+      toast('✅ Паролата е сменена! Влез с новата парола.');
+    } catch(err) {
+      shwE('recovery-err', err.message || 'Грешка при смяна.');
+      gi('recovery-submit').disabled = false;
+      gi('recovery-submit').textContent = 'Запази новата парола';
+    }
+  });
+});
+
 /* ── Ready ───────────────────────────────────────────────── */
 console.log('%c EqualPath v4.0 ✓ Backend Connected ', 'background:#1e9e75;color:#fff;font-weight:bold;padding:4px 10px;border-radius:4px;');
