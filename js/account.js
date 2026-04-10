@@ -322,6 +322,59 @@ async function loadSavedRoutes() {
 }
 
 
+/* ── Изтриване на акаунт ────────────────────────────────── */
+gi('btn-delete-account').addEventListener('click', () => {
+  gi('delete-confirm-input').value = '';
+  clrE('delete-confirm-err');
+  gi('delete-confirm-overlay').classList.add('is-open');
+});
+
+gi('delete-cancel').addEventListener('click', () => {
+  gi('delete-confirm-overlay').classList.remove('is-open');
+});
+
+gi('delete-confirm-overlay').addEventListener('click', (e) => {
+  if (e.target === gi('delete-confirm-overlay')) gi('delete-confirm-overlay').classList.remove('is-open');
+});
+
+gi('delete-do').addEventListener('click', async () => {
+  const confirm = gi('delete-confirm-input').value.trim();
+  clrE('delete-confirm-err');
+  if (confirm !== 'ИЗТРИЙ') {
+    shwE('delete-confirm-err', 'Напиши ИЗТРИЙ за потвърждение.');
+    return;
+  }
+
+  const btn = gi('delete-do');
+  btn.disabled = true;
+  btn.textContent = 'Изтрива...';
+
+  try {
+    const resp = await fetch(`${API_BASE}/api/profiles/${S.user.id}/delete`, {
+      method: 'DELETE',
+    });
+    const data = await resp.json();
+    if (!data.ok) throw new Error(data.error);
+
+    // Sign out and clear everything
+    await sb.auth.signOut();
+    S.user = null;
+    clearMapRoute();
+    gi('btn-login').style.display = 'flex';
+    gi('user-chip').style.display = 'none';
+    gi('profile-user-banner').classList.remove('vis');
+    gi('user-menu').style.display = 'none';
+    gi('delete-confirm-overlay').classList.remove('is-open');
+    closeAccount();
+    sessionStorage.clear();
+    toast('Профилът е изтрит. Можеш да се регистрираш отново.');
+  } catch (err) {
+    shwE('delete-confirm-err', err.message || 'Грешка при изтриване.');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🗑️ Изтрий завинаги';
+  }
+});
 /* ── Зареждане на запазен маршрут на картата ──────────────── */
 function loadSavedRouteOnMap(rt) {
   // Подготви данните в формата, който renderRoute очаква

@@ -67,12 +67,28 @@ document.addEventListener('keydown', e => {
 
 
 /* ── Sidebar toggle (mobile) ─────────────────────────────── */
+function closeSidebar() {
+  const sidebar = gi('sidebar');
+  sidebar.classList.remove('is-open');
+  document.body.classList.remove('sidebar-open');
+  gi('sidebar-toggle').setAttribute('aria-expanded', 'false');
+  gi('sidebar-toggle').setAttribute('aria-label', 'Отвори менюто');
+}
+
 gi('sidebar-toggle').addEventListener('click', () => {
   const sidebar = gi('sidebar');
   const open = sidebar.classList.toggle('is-open');
   document.body.classList.toggle('sidebar-open', open);
   gi('sidebar-toggle').setAttribute('aria-expanded', String(open));
   gi('sidebar-toggle').setAttribute('aria-label', open ? 'Затвори менюто' : 'Отвори менюто');
+});
+
+// Close sidebar by tapping map area on mobile
+gi('map-wrapper').addEventListener('click', (e) => {
+  const sidebar = gi('sidebar');
+  if (sidebar.classList.contains('is-open') && window.innerWidth <= 768) {
+    closeSidebar();
+  }
 });
 
 

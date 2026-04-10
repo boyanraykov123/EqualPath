@@ -109,7 +109,7 @@ const NEEDS_FILTER = {
 /* ── Автоматични филтри по профил ─────────────────────────── */
 const PFILTERS = {
   wheelchair: { 'filter-no-stairs': true,  'filter-smooth': true,  'filter-quiet': false, 'filter-no-crowds': false, 'filter-shade': false },
-  autism:     { 'filter-no-stairs': false, 'filter-smooth': false, 'filter-quiet': true,  'filter-no-crowds': true,  'filter-shade': true  },
+  autism:     { 'filter-no-stairs': false, 'filter-smooth': false, 'filter-quiet': true,  'filter-no-crowds': true,  'filter-shade': false },
   stroller:   { 'filter-no-stairs': true,  'filter-smooth': true,  'filter-quiet': false, 'filter-no-crowds': false, 'filter-shade': false },
   general:    { 'filter-no-stairs': false, 'filter-smooth': false, 'filter-quiet': false, 'filter-no-crowds': false, 'filter-shade': false },
 };

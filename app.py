@@ -594,9 +594,16 @@ def create_buddy_request():
 
 @app.route("/api/buddy-requests", methods=["GET"])
 def get_buddy_requests():
-    """Връща всички отворени заявки за помощ."""
+    """Връща всички отворени заявки за помощ. Изтрива изтекли автоматично."""
     try:
         db = get_db()
+        from datetime import datetime
+        now = datetime.now()
+        today = now.strftime("%Y-%m-%d")
+        current_time = now.strftime("%H:%M")
+        # Auto-delete expired open requests (past date, or today with past time)
+        db.table("buddy_requests").delete().eq("status", "open").lt("date", today).execute()
+        db.table("buddy_requests").delete().eq("status", "open").eq("date", today).lt("time", current_time).neq("time", "").execute()
         result = db.table("buddy_requests").select("*").eq("status", "open").order("date", desc=False).execute()
     except Exception as e:
         return jsonify({"ok": False, "error": f"Грешка: {e}"}), 500
@@ -671,6 +678,35 @@ def delete_buddy_request(request_id):
     try:
         db = get_db()
         db.table("buddy_requests").delete().eq("id", request_id).execute()
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Грешка: {e}"}), 500
+
+    return jsonify({"ok": True})
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# /api/profiles/delete  (изтриване на акаунт)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@app.route("/api/profiles/<user_id>/delete", methods=["DELETE"])
+def delete_account(user_id):
+    """Изтрива потребител напълно — профил, маршрути, заявки, Auth."""
+    if not user_id:
+        return jsonify({"ok": False, "error": "Липсва user_id."}), 400
+
+    try:
+        db = get_db()
+        # 1. Delete buddy requests (as user and as buddy)
+        db.table("buddy_requests").delete().eq("user_id", user_id).execute()
+        db.table("buddy_requests").delete().eq("buddy_id", user_id).execute()
+        # 2. Delete saved routes
+        db.table("saved_routes").delete().eq("user_id", user_id).execute()
+        # 3. Delete reports
+        db.table("reports").delete().eq("user_id", user_id).execute()
+        # 4. Delete profile
+        db.table("profiles").delete().eq("user_id", user_id).execute()
+        # 5. Delete from Supabase Auth
+        db.auth.admin.delete_user(user_id)
     except Exception as e:
         return jsonify({"ok": False, "error": f"Грешка: {e}"}), 500
 

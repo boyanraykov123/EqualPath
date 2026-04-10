@@ -478,9 +478,30 @@
         </div>
       </div>
     </div>
+
+    <!-- Изтриване на акаунт -->
+    <div class="acc-delete-section">
+      <button id="btn-delete-account" class="acc-delete-btn">🗑️ Изтрий профила ми</button>
+    </div>
   </div>
 </div>
 
+
+<!-- DELETE CONFIRM MODAL -->
+<div id="delete-confirm-overlay" class="modal-overlay">
+  <div class="modal-box" style="max-width:380px;padding:2rem;text-align:center">
+    <div style="font-size:2.5rem;margin-bottom:.75rem">⚠️</div>
+    <h2 class="modal-title">Сигурен ли си?</h2>
+    <p class="modal-subtitle">Тази операция е необратима. Профилът, маршрутите и всички данни ще бъдат изтрити завинаги.</p>
+    <p style="font-size:.82rem;color:var(--ink-muted);margin-bottom:1rem">Напиши <strong>ИЗТРИЙ</strong> за потвърждение:</p>
+    <input type="text" id="delete-confirm-input" class="form-input" placeholder="ИЗТРИЙ" style="text-align:center;margin-bottom:.75rem"/>
+    <p class="form-error" id="delete-confirm-err"></p>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="delete-cancel">Отказ</button>
+      <button class="btn-primary" id="delete-do" style="background:var(--red);flex:2">🗑️ Изтрий завинаги</button>
+    </div>
+  </div>
+</div>
 
 <!-- OBSTACLE MODAL -->
 <div id="obs-overlay" class="modal-overlay">

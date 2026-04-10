@@ -76,6 +76,12 @@ function setPickMode(mode) {
 gi('btn-pick-on-map').addEventListener('click', () => {
   const t = !S.from ? 'from' : (!S.to ? 'to' : 'from');
   setPickMode(t);
+  // Close sidebar on mobile so user can see the map
+  const sidebar = gi('sidebar');
+  if (sidebar.classList.contains('is-open') && window.innerWidth <= 768) {
+    sidebar.classList.remove('is-open');
+    document.body.classList.remove('sidebar-open');
+  }
   toast(`Кликни на картата за ${t === 'from' ? 'начална' : 'крайна'} точка`);
 });
 

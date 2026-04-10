@@ -344,6 +344,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--surface);color:var(--ink)
 .sr-btn-del{background:#fef2f2;color:var(--red);border:1px solid #fca5a5}
 .sr-btn-del:hover{background:var(--red);color:#fff}
 
+/* Delete account */
+.acc-delete-section{margin-top:2rem;padding-top:1.25rem;border-top:1px solid var(--border)}
+.acc-delete-btn{width:100%;padding:.75rem 1rem;background:transparent;border:none;font-family:'DM Sans',sans-serif;font-size:.8rem;font-weight:500;color:var(--ink-faint);cursor:pointer;transition:color .15s;text-align:center}
+.acc-delete-btn:hover{color:var(--red)}
+
 /* ═══════════════════════════════════════════════════════════
    ROLE SELECTION (Registration Step 2)
    ═══════════════════════════════════════════════════════════ */
